@@ -55,7 +55,7 @@ execute:
   echo: true
   warning: false
   message: false
-editor: visual
+editor: source
 ---
 
 ```{r load package, warning=FALSE, message=FALSE}
@@ -75,7 +75,7 @@ $$
 
 \noindent can be decomposed into the Average Treatment Effect on the Treated (ATT) plus a selection bias term. Show that $\pi$ can equivalently be decomposed into the Average Treatment Effect on the Controls (ATC) plus a selection bias term. In words, explain the meaning of this alternative selection bias.
 
-\noindent 2. Suppose treatment status $D_i$ is independent of potential outcomes $Y_i(d), \:d\in\{0,1\}$ conditional on a set of covariates $X_i$. Define the Conditional ATE (CATE) as 
+\noindent 2. Suppose treatment status $D_i$ is independent of potential outcomes $Y_i(d), \:d\in\{0,1\}$ conditional on a set of covariates $X_i$. Define the Conditional ATE (CATE) as
 
 $$
 \delta(X_i) = E[Y_i(1) \mid X_i] - E[Y_i(0) \mid X_i]
@@ -85,7 +85,7 @@ $$
 
 $$
 \begin{aligned}
-\delta(X_i) &= Y_i \left[\frac{\mathds{1}(D_i=1)}{P(D_i=1\mid X_i)} - \frac{\mathds{1}(D_i=0)}{1-P(D_i=1\mid X_i)}\right]
+\delta(X_i) &= E\left[Y_i \left(\frac{\mathds{1}(D_i=1)}{P(D_i=1\mid X_i)} - \frac{\mathds{1}(D_i=0)}{1-P(D_i=1\mid X_i)}\right) \middle| X_i \right]
 \end{aligned}
 $$
 
@@ -165,14 +165,14 @@ $$
 \noindent where $\epsilon_U$, $\epsilon_Y$, $\epsilon_S$, and $\epsilon_B$ are independent $\mathcal{N}(0,1)$ shocks. Show the following equation holds, and explain the implication of the equation.
 
 $$
-E[Y \mid S, B] = S + B + (1-\kappa/2)S + (1+\kappa/2)B
+E[Y \mid S, B] = (1-\kappa/2)S + (1+\kappa/2)B
 $$
-    
+
 # Test of Convergence Hypothesis
 
 In lecture, we provided an empirical example of partialling-out with Double LASSO to estimate the regression coefficient $\beta_1$ in the high-dimensional linear regression model. Specifically, we estimated how the rates at which economies of different countries grow ($Y_i$) are related to the initial wealth levels in each country ($D_i$) controlling for country's institutional, educational, and other similar characteristics ($X_i$). The relationship is captured by $\beta_1$, the *speed of convergence/divergence*, which measures the speed at which poor countries catch up $(\beta_1<0)$ or fall behind $(\beta_1>0)$ rich countries, after controlling for $X_i$.
 
-In this assignment, I want you to use the formal procedure of Double Machine Learning to re-estimate $\beta_1$. Specifically, I want you fine-tune a shallow one-layer Neural Network to estimate the nuisance function for $Y_i$ and $D_i$ using $X_i$, and residualize $Y_i$ and $D_i$ using cross-fitting. 
+In this assignment, I want you to use the formal procedure of Double Machine Learning to re-estimate $\beta_1$. Specifically, I want you fine-tune a shallow one-layer Neural Network to estimate the nuisance function for $Y_i$ and $D_i$ using $X_i$, and residualize $Y_i$ and $D_i$ using cross-fitting.
 
 ```{r load data, warning=FALSE}
 library(hdm)
@@ -196,12 +196,12 @@ d <- growth$gdpsh465
 
 \noindent I have already implemented a Neural Network model using `keras3` and performed a manual grid search to fine-tune its hyperparameters. The tuning procedure evaluated each candidate model on a 20% validation split, and the best configuration was chosen based on the lowest validation loss. The default hyperparameter grid includes:
 
-  - Number of hidden neurons (`units`): 10, 50, 100
-  - Learning rate (`lr`): 0.001, 0.02, 0.05
-  - Batch size: 15 (no tuning)
-  - Number of epochs: 50, 100, 200, 400
+-   Number of hidden neurons (`units`): 10, 50, 100
+-   Learning rate (`lr`): 0.001, 0.02, 0.05
+-   Batch size: 15 (no tuning)
+-   Number of epochs: 50, 100, 200, 400
 
-This setup allowed the model to be optimized over different network sizes, learning speeds, mini-batch sizes, and training durations. I also used early stopping based on 10 epoch's validation loss. 
+This setup allowed the model to be optimized over different network sizes, learning speeds, mini-batch sizes, and training durations. I also used early stopping based on 10 epoch's validation loss.
 
 ```{r, fine tune NN, warning=FALSE}
 
@@ -267,14 +267,14 @@ tune_keras <- function(x, y,
 
 \noindent Now I want you to fine-tune the NN model *before* cross-fitting. That is, do not fine-tune the model within each $K-1$ fold, but only fine-tune model once based on the whole sample. Use the default grid search for $Y$, but use the following grid search for $D$:
 
-  - Number of hidden neurons (`units`): 10, 50, 100
-  - Learning rate (`lr`): 0.001, 0.02, 0.05
-  - Batch size: 15 (no tuning)
-  - Number of epochs: 500, 1000, 2000
+-   Number of hidden neurons (`units`): 10, 50, 100
+-   Learning rate (`lr`): 0.001, 0.02, 0.05
+-   Batch size: 15 (no tuning)
+-   Number of epochs: 500, 1000, 2000
 
 Then use the NN model with the combination of hyperparameters that reports the lowest validation loss to estimate the nuisance function. You may find such model by calling
 
-```r
+``` r
 ymodel <- build_and_fit(
       x[-I[[b]], ], y[-I[[b]]], ## suppose you are retrieving the nuisance function for Y
       units = best_y$units,
@@ -284,8 +284,7 @@ ymodel <- build_and_fit(
     )$model
 ```
 
-Residualize your $Y$ and $D$ and report the point estimate of $\beta_1$ and its standard error using the standard DML pipeline. What can you conclude from this practice? Note this may take a while for `R` to complete. 
-
+Residualize your $Y$ and $D$ and report the point estimate of $\beta_1$ and its standard error using the standard DML pipeline. What can you conclude from this practice? Note this may take a while for `R` to complete.
 
 ```{r DML using NN, warning=FALSE, eval=FALSE}
 

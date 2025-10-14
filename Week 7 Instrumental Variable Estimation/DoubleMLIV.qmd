@@ -1,0 +1,287 @@
+---
+title: "Week 6 Double Machine Learning for Partially Linear IV Model"
+format:
+  pdf:
+    pdf-engine: pdflatex 
+    documentclass: article
+    classoption: ["12pt"]
+    geometry: "top=1.1in, bottom=1.1in, left=1.1in, right=1.1in"
+    include-in-header:
+      text: |
+        \DeclareMathOperator*{\argmin}{arg\,min}
+        % fonts, math
+        \usepackage[T1]{fontenc}
+        \usepackage{dsfont}
+        \usepackage{newpxtext}
+        \let\arrowvert\relax
+        \let\Arrowvert\relax
+        \let\mathscr\relax
+        \usepackage{newpxmath}
+        \usepackage{amsmath}
+        \usepackage{bm}
+        
+        % colors
+        \usepackage[dvipsnames]{xcolor}
+        
+        % Indent & line spacing
+        \usepackage{setspace}
+        \setstretch{1.2}
+        \setlength{\parindent}{20pt}
+        \AtBeginDocument{
+        \setlength{\abovedisplayshortskip}{-10pt}
+        \setlength{\belowdisplayshortskip}{3.5pt}
+        }
+        
+        % Figures
+        \usepackage{graphicx}
+        \usepackage{tikz}
+        \usetikzlibrary{arrows.meta, positioning, fit}
+
+        % Equal spacing between Title, Date, Author
+        \makeatletter
+        \renewcommand{\maketitle}{%
+          \begin{center}
+            {\LARGE \bfseries \@title \par}
+            \vspace{0.75em}%
+            {\large \itshape \@date \par}
+            \vspace{0.75em}%
+            {\large \@author \par}
+          \end{center}\par\vspace{1em}
+        }
+        \makeatother
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: source
+---
+
+# Partially Linear IV Model
+
+We consider the partially linear structural equation model
+
+$$
+\begin{aligned}
+ Y_i :=~& \theta_0 D_i + g_0(X_i) + \zeta_i,  & E[\zeta_i \mid Z_i,X_i]= 0 \\
+ Z_i :=~& m_0(X_i) +  \epsilon_i,   &  E[\epsilon_i \mid X_i] = 0
+\end{aligned}
+$$
+
+where there is a structural or causal relation between $D_i$ and $Y_i$, captured by $\theta_0$. $g_0(X_i) + \zeta_i$ is the stochastic error, partly explained by covariates $X_i$.  $\epsilon_i$ and $\zeta_i$ are stochastic errors that are not explained by $X_i$. $Y_i$ and $D_i$ are jointly determined, meaning that $D_i$ is *endogeneous*, with $E[\zeta_i \mid D_i] \neq 0$. The instrument, $Z_i$, is introduced to create exogenous variation
+in $D_i$. The observed $X_i$ serve as confounding factors, and we can think of variation in $Z_i$ as being exogenous conditional on $X_i$.
+
+
+# PLIV Model in Residualized Form
+
+The PLIV model above can be rewritten in the following residualized form
+
+$$
+  \tilde Y_i = \theta_0 \tilde D_i + \zeta_i,   \quad  E[\zeta_i \mid \epsilon_i,X_i]= 0
+$$
+where
+$$
+\begin{aligned}
+ \tilde Y_i &= (Y_i - \ell_0(X_i)),  \quad &\ell_0(X_i) &= E[Y_i \mid X_i] \\
+   \tilde D_i &= (D_i - r_0(X_i)), \quad &r_0(X_i) &= E[D_i \mid X_i] \\
+   \tilde Z_i &= (Z_i - m_0(X_i)), \quad &m_0(X_i) &= E[Z_i \mid X_i]
+\end{aligned}
+$$
+
+# DML for PLIV Model
+
+Given the valid instrument for identification, DML proceeds as follows.
+
+Compute the estimates $\hat \ell_0$, $\hat r_0$, and $\hat m_0$ , which amounts
+to solving the three problems of predicting $Y_i$, $D_i$, and $Z_i$ using
+$X_i$, using any generic ML methods. Then estimate $\theta_0$ by the the instrumental variable regression of $\tilde Y$ on $\tilde D$ using $\tilde Z$ as an instrument.
+Use the conventional inference for the IV regression estimator, ignoring
+the estimation error in these residuals.
+
+```{r load package, warning=FALSE, message=FALSE}
+library(hdm)
+library(AER)
+library(randomForest)
+library(lfe)
+library(glmnet)
+set.seed(1)
+```
+
+```{r DML for PLIV Model, warning=FALSE, message=FALSE}
+
+## DML for PLIV Model
+dml2_for_plivm <- function(x, d, z, y, dreg, yreg, zreg, nfold = 5) {
+  
+  ## cross-fitting
+  nobs <- nrow(x)
+  foldid <- rep.int(1:nfold, times = ceiling(nobs / nfold))[sample.int(nobs)]
+  I <- split(1:nobs, foldid)
+  
+  ## create residualized objects to fill
+  ytil <- dtil <- ztil <- rep(NA, nobs)
+  
+  ## obtain cross-fitted residuals
+  cat("fold: ")
+  for (b in seq_along(I)) {
+    dfit <- dreg(x[-I[[b]], ], d[-I[[b]]]) ## take a fold out
+    zfit <- zreg(x[-I[[b]], ], z[-I[[b]]]) ## take a fold out
+    yfit <- yreg(x[-I[[b]], ], y[-I[[b]]]) ## take a fold out
+    dhat <- predict(dfit, x[I[[b]], ], type = "response") ## predict the held-out fold
+    zhat <- predict(zfit, x[I[[b]], ], type = "response") ## predict the held-out fold
+    yhat <- predict(yfit, x[I[[b]], ], type = "response") ## predict the held-out fold
+    dtil[I[[b]]] <- (d[I[[b]]] - dhat) # record residual
+    ztil[I[[b]]] <- (z[I[[b]]] - zhat) # record residual
+    ytil[I[[b]]] <- (y[I[[b]]] - yhat) # record residual
+    cat(b, " ")
+  }
+  ivfit <- tsls(y = ytil, d = dtil, x = NULL, z = ztil, intercept = FALSE)
+  coef_est <- ivfit$coef ## extract coefficient
+  se <- ivfit$se ## record standard error
+  cat(sprintf("\ncoef (se) = %g (%g)\n", coef_est, se))
+  return(list(coef_est = coef_est, se = se, dtil = dtil, ytil = ytil, ztil = ztil))
+}
+```
+
+
+# Emprical Example:  Acemoglu, Johnson, Robinson (AER)
+
+* $Y_i$ is log modern GDP;
+* $D_i$ is a measure of protection from expropriation, a proxy for quality of institutions;
+* $Z_i$ is the log of settler's mortality;
+* $W_i$ are geographical variables (latitude, latitude squared, continent dummies as well as interactions)
+
+```{r read AJR, warning=FALSE, message=FALSE}
+## read AJR data
+file <- "https://raw.githubusercontent.com/CausalAIBook/MetricsMLNotebooks/main/data/AJR.csv"
+AJR <- read.csv(file)
+dim(AJR)
+
+## construct variables
+y <- AJR$GDP
+d <- AJR$Exprop
+z <- AJR$logMort
+xraw <- model.matrix(~ Latitude + Africa + Asia + Namer + Samer, data = AJR)
+x <- model.matrix(~ -1 + (Latitude + Latitude2 + Africa + Asia + Namer + Samer)^2, data = AJR)
+dim(x)
+```
+
+```{r standard IV estimation, message=FALSE, warning=FALSE}
+
+## IV specification and weak IV test
+library(ivreg)
+fit <- ivreg(y ~ d + Latitude + Africa + Asia + Namer + Samer | 
+               z + Latitude + Africa + Asia + Namer + Samer, 
+             data = AJR)
+summary(fit, diagnostics = TRUE)
+```
+
+
+```{r application of DML for PLIV Model, message=FALSE, warning=FALSE}
+
+set.seed(1)
+
+## DML with Post-Lasso
+cat(sprintf("\n DML with Post-Lasso \n"))
+
+dreg <- function(x, d) {
+  hdm::rlasso(x, d, post=TRUE) ## default plug-in penalty level
+} 
+yreg <- function(x, y) {
+  hdm::rlasso(x, y, post=TRUE) ## default plug-in penalty level
+}
+zreg <- function(x, z) {
+  hdm::rlasso(x, z, post=TRUE) ## default plug-in penalty level
+}
+
+## specify the function
+dml2_lasso <- dml2_for_plivm(x, d, z, y, dreg, yreg, zreg, nfold = 5)
+
+# DML with Random Forest
+cat(sprintf("\n DML with Random Forest \n"))
+
+dreg <- function(x, d) {
+  randomForest(x, d) ## default ntrees = 500
+}
+yreg <- function(x, y) {
+  randomForest(x, y) ## default ntrees = 500
+}
+zreg <- function(x, z) {
+  randomForest(x, z) ## default ntrees = 500
+}
+
+## specify the function
+dml2_rf <- dml2_for_plivm(xraw, d, z, y, dreg, yreg, zreg, nfold = 5)
+
+## compare Forest vs Lasso
+comp_tab <- matrix(NA, 3, 2)
+comp_tab[1, ] <- c(sqrt(mean((dml2_rf$ytil)^2)), sqrt(mean((dml2_lasso$ytil)^2)))
+comp_tab[2, ] <- c(sqrt(mean((dml2_rf$dtil)^2)), sqrt(mean((dml2_lasso$dtil)^2)))
+comp_tab[3, ] <- c(sqrt(mean((dml2_rf$ztil)^2)), sqrt(mean((dml2_lasso$ztil)^2)))
+rownames(comp_tab) <- c("RMSE for Y:", "RMSE for D:", "RMSE for Z:")
+colnames(comp_tab) <- c("RF", "LASSO")
+print(comp_tab, digits = 3)
+```
+
+# Weak Instrument Problem
+
+```{r weak instrument, warning=FALSE, message=FALSE}
+
+## using lfe package
+summary(felm(dml2_lasso$dtil ~ dml2_lasso$ztil), robust = TRUE)
+summary(felm(dml2_rf$dtil ~ dml2_rf$ztil), robust = TRUE)
+```
+
+## Anderson-Rubin Idea for Inference with Weak Instruments
+
+As shown above, we may have weak instruments because the F-statistics in the regression $\tilde D_i \sim \tilde Z_i$ is small relative to standard rules of thumb -- for example Stock and Yogo (2005) suggest accounting for weak instruments if the first stage F-statistic is less than 10 (and more recent work suggests even larger cutoffs).
+
+
+Here, we consider one specific approach (from Anderson and Rubin (1949)) for valid inference under weak identification based upon the statistic:
+
+$$
+C(\theta) = \frac{ |\mathbb{E}_n [(\tilde Y -  \theta  \tilde D) \tilde Z]|^2}{ \mathbb{V}_n [(\tilde Y -  \theta \tilde  D) \tilde Z ]/n}
+$$
+The empirical variance $\mathbb{V}_n$ is defined as
+
+$$
+\begin{aligned}
+\mathbb{V}_{n}[ g(W_i)] &:=   \mathbb{E}_{n}g(W_i)g(W_i)' - \mathbb{E}_{n}[ g(W_i)]\mathbb{E}_{n}[ g(W_i)]'
+\end{aligned}
+$$
+
+If $\theta_0 = \theta$, then $C(\theta) \xrightarrow{d} \mathcal{N}(0,1)^2 = \chi^2(1)$. Therefore,  we can reject the hypothesis $\theta_0 = \theta$ at level $a$ (for example $a = .05$ for a 5\% level test)  if $C(\theta)> c(1-a)$ where $c(1-a)$ is the $(1-a)$- quantile of a $\chi^2(1)$ variable. The probability of falsely rejecting the true hypothesis is approximately $a \times 100\%$.  
+
+To construct a $(1-a) \times 100$\% confidence region for $\theta$, we can then simply invert the test by collecting all parameter values that are not rejected at the $a$ level:
+$$
+CR(\theta) = \{ \theta \in \Theta: C(\theta)  \leq c(1-a)\}
+$$
+
+```{r implementation of DML-AR, warning=FALSE, message=FALSE}
+
+## DML-AR (DML with Anderson-Rubin)
+dml_ar_pliv <- function(rY, rD, rZ, grid, alpha = .05) {
+  n <- length(rY)
+  Cstat <- rep(0, length(grid))
+  for (i in seq_along(grid)) {
+    Cstat[i] <- n * (mean((rY - grid[i] * rD) * rZ))^2 / var((rY - grid[i] * rD) * rZ)
+  }
+  LB <- min(grid[Cstat < qchisq(1 - alpha, 1)])
+  UB <- max(grid[Cstat < qchisq(1 - alpha, 1)])
+  plot(range(grid), range(c(Cstat)), type = "n", xlab = "Effect of institutions", ylab = "Statistic", main = " ")
+  lines(grid, Cstat, lty = 1, col = 1)
+  abline(h = qchisq(1 - alpha, 1), lty = 3, col = 4)
+  abline(v = LB, lty = 3, col = 2)
+  abline(v = UB, lty = 3, col = 2)
+  return(list(UB = UB, LB = LB))
+}
+
+dml_ar_pliv(
+  rY = dml2_lasso$ytil, rD = dml2_lasso$dtil, rZ = dml2_lasso$ztil,
+  grid = seq(-2, 2, by = .01)
+)
+dml_ar_pliv(
+  rY = dml2_rf$ytil, rD = dml2_rf$dtil, rZ = dml2_rf$ztil,
+  grid = seq(-2, 2, by = .01)
+)
+```
+
+For any $\theta$ with $C(\theta) \leq 3.84$, we cannot reject the null hypothesis that $\theta = \theta_0$ at the 5% level. Those $\theta$ values form the Anderson–Rubin confidence set.

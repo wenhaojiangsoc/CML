@@ -1,0 +1,162 @@
+---
+title: "Week 6: Propensity Score Weighting"
+format: pdf
+editor: visual
+---
+
+# Overview
+
+This practice demonstrates the use of the `PSweight` package in `R` to estimate causal effects using propensity score weighting with machine learning method, such as Boosted Trees and Super-Learner that integrates multiple ML methods. Augmented IPW is also introduced. We use the NCDS (National Child Development Survey) dataset included in the `PSweight` package. If you are interested in the full use of the package, read the [tutorial](https://journal.r-project.org/articles/RJ-2022-011/).
+
+Treatment: `Dany` (indicator of any further education beyond age 16), Outcome: `wage` (log wage) Covariates: parental education, parental employment, ethnicity, etc.
+
+```{r load package, warning=FALSE, message=FALSE}
+library(PSweight)
+library(SuperLearner)
+library(ggplot2)
+
+## load NCDS dataset
+data("NCDS", package="PSweight")
+head(NCDS)
+```
+
+# Setup
+
+Define treatment, outcome, covariates, and propensity score and regression equation. Note that the missing function `ftilt()` in class will no longer be missing if you specify the `weight` parameter correctly as shown below.
+
+```{r define variables, warning=FALSE, message=FALSE}
+## covariates
+covars <- c("white", "maemp", "qmab2", "paed_u", "maed_u", "agepa")
+
+## define propensity score
+ps.formula  <- reformulate(covars, response = "Dany")
+```
+
+## Estimate Treatment Effect by Propensity Score Weighting Using Boosted Trees
+
+```{r boosted trees, warning=FALSE, message=FALSE}
+res_gbm <- PSweight(
+  ps.formula = ps.formula,
+  yname = "wage",
+  data = NCDS,
+  weight = "IPW",          ## estimand; it can be `IPW` for estimating ATE, `treated` for ATT, and `overlap` for the overlapped population
+  ps.method = "gbm",       ## propensity fit by gradient boosting (gbm) or SuperLearner; of course you can also use GLM
+  ps.control = list(n.trees=500, interaction.depth=3)
+)
+
+## summarize results
+summary(res_gbm)$estimates
+```
+
+One important step after estimating the propensity score is to evaluate the common support of propensity across treated and control groups, to ensure that there is sufficient overlap in the distribution of estimated scores. This overlap indicates that for each treated unit, there exist comparable control units (and vice versa), allowing for meaningful causal inference without extrapolation beyond observed data.
+
+```{r common support boosted trees, warning=FALSE, message=FALSE}
+
+## PSweight has a built in function for checking common support and covariate balance
+bal.mult <- SumStat(
+  ps.formula = ps.formula,
+  data = NCDS,
+  weight = c("IPW", "overlap", "entropy", "treated"), ## various approaches to weight individuals
+  method = "gbm",       ## propensity fit by gradient boosting (gbm) or SuperLearner
+  ps.control = list(n.trees=500, interaction.depth=3)
+)
+
+## plot the propensity score density
+plot(bal.mult, type = "density")
+
+## if you want to customize the figure, you may
+## manually calculate propensity of being treated/being controlled and plot by ggplot
+NCDS$treat_prob <- res_gbm$propensity[,2]
+NCDS$control_prob <- res_gbm$propensity[,1]
+
+ggplot(NCDS, aes(x = treat_prob, fill = as.factor(Dany))) +
+  geom_density(alpha = 0.4) +
+  scale_fill_manual(
+    values = c("0" = "grey", "1" = "orange"),      # assign colors to factor levels
+    labels = c("0" = "No", "1" = "Yes")           # legend labels
+  ) +
+  labs(
+    fill = "Treatment",
+    x = "Propensity Score",
+    y = "Density",
+    title = "Propensity Score Overlap (GBM)"
+  ) +
+  theme_bw(base_family = "Palatino") +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title = element_text(size = 10),
+    plot.title = element_text(size = 12, hjust=0.5)
+  )
+```
+
+## Covariate Balance Check
+
+After estimating the propensity scores and constructing weights, it is essential to evaluate covariate balance between treated and control groups. The goal of propensity score weighting is to create a pseudo-population where the distribution of observed covariates is similar across groups—mimicking random assignment. By checking covariate balance, we can verify whether the weighting procedure has successfully reduced systematic differences and minimized confounding bias. Poor balance indicates that the estimated treatment effects may still be biased, while good balance suggests that the weighting has achieved comparability between groups.
+
+```{r balance check, warning=FALSE, message=FALSE}
+## PSweight has a built-in function for covariate balance check
+plot(bal.mult, metric = "ASD")
+```
+
+# Estimate the Treatment Effect by Doubly Robust SuperLearner
+
+```{r DR superlearner, warning=FALSE, message=FALSE}
+res_dr <- PSweight(
+  ps.formula = ps.formula,
+  yname = "wage",
+  data = NCDS,
+  weight = "IPW",                   ## estimand
+  ps.method = "SuperLearner",       ## propensity fit by SuperLearner
+  augmentation = TRUE,
+  out.formula = wage ~ white + maemp + qmab2 + paed_u + maed_u + agepa,
+  out.method = "glm", ## this can also be estimated using GLM
+)
+
+## summarize results
+summary(res_dr)$estimates
+```
+
+```{r common support superlearner, warning=FALSE, message=FALSE}
+
+## calculate propensity of being treated/being controlled
+NCDS$treat_prob <- res_dr$propensity[,2]
+NCDS$control_prob <- res_dr$propensity[,1]
+
+ggplot(NCDS, aes(x = treat_prob, fill = as.factor(Dany))) +
+  geom_density(alpha = 0.4) +
+  scale_fill_manual(
+    values = c("0" = "grey", "1" = "orange"),      # assign colors to factor levels
+    labels = c("0" = "No", "1" = "Yes")           # legend labels
+  ) +
+  labs(
+    fill = "Treatment",
+    x = "Propensity Score",
+    y = "Density",
+    title = "Propensity Score Overlap (SuperLearner)"
+  ) +
+  theme_bw(base_family = "Palatino") +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title = element_text(size = 10),
+    title = element_text(size = 10)
+  )
+
+## check balance
+bal.mult <- SumStat(
+  ps.formula = ps.formula,
+  data = NCDS,
+  weight = c("IPW", "overlap", "entropy", "treated"), ## various approaches to weight individuals
+  method = "SuperLearner"
+)
+
+## plot the propensity score density
+plot(bal.mult, metric = "ASD")
+```
