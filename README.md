@@ -181,17 +181,11 @@ Next, we discuss *bandwidth selection* and the Imbens–Kalyanaraman (IK) optima
 
 ### Roadmap
 
-- Introduce the *sharp regression discontinuity (RD)* framework and the two core assumptions:  
-  1. *Continuity of potential outcomes* around the cutoff.  
-  2. *No manipulation* of the running variable near the threshold.  
+- Introduce the *sharp regression discontinuity (RD)* framework and the two core assumptions.  
 
-- Define the *local average treatment effect (LATE)* at the cutoff and illustrate its estimation using local linear regression.  
+- Define the *local average treatment effect (LATE)* at the cutoff and illustrate its estimation using local linear regression. We illustrate the use of RD by discussing several empirical applications.
 
 - Explain the *bias–variance tradeoff* and the logic of *kernel weighting* and *bandwidth selection* (Imbens–Kalyanaraman rule).  
-
-- Discuss empirical applications of sharp RD, including:  
-  - *Lee (2008)*: incumbency advantage in close U.S. elections.  
-  - *Lei and Zhou (2022)*: infrastructure investment thresholds in Chinese cities.  
 
 - Demonstrate how to incorporate *covariates* in RDD to improve precision and efficiency.  
 
