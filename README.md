@@ -137,3 +137,70 @@ Finally, we study *Augmented Inverse Probability Weighting (AIPW)*, a *doubly ro
 ---
 </details>
 
+<details>
+  <summary><h2>Week 7 Instrumental Variable Estimation</h2></summary>
+
+This week introduces the *Instrumental Variable (IV)* framework for identifying causal effects when the treatment variable is *endogenous*—that is, correlated with unobserved confounders. Building on the potential outcomes and DAG frameworks from earlier weeks, we explore how valid instruments can recover causal estimates by generating *exogenous variation* in the treatment.  
+
+We begin by revisiting the problem of *omitted variable bias*, showing how unobserved confounders can bias regression estimates. We then define the two key assumptions of IV identification—*relevance* (the instrument must shift the treatment) and *exogeneity* (the instrument must not directly affect the outcome). Using these conditions, we derive the *Wald estimator* and extend to the general *Two-Stage Least Squares (2SLS)* framework.  
+
+We illustrate these concepts through two canonical applications: *settler mortality and institutional quality* (Acemoglu, Johnson, and Robinson, 2001) and *quarter of birth and education* (Angrist and Krueger, 1991). We then discuss inference challenges under weak instruments, review the *Anderson–Rubin (AR)* test, and introduce its robust extension for use with *Double Machine Learning (DML)* in high-dimensional settings.  
+
+### Roadmap
+
+- Revisit the problem of *omitted variable bias* and explain why standard regression or matching approaches fail when unobserved confounding exists.  
+
+- Introduce *instrumental variables* and the conditions for valid identification: *relevance* and *exogeneity*.  
+
+- Derive the *Wald estimator* and connect it to the *Two-Stage Least Squares (2SLS)* procedure.  
+
+- Explore empirical applications including:
+  - *Colonial Origins of Comparative Development* (AJR, 2001): settler mortality as an instrument for institutional quality.  
+  - *Quarter-of-Birth and Schooling* (Angrist & Krueger, 1991): compulsory schooling laws as instruments for education.  
+
+- Discuss the consequences of *weak instruments* and diagnose instrument strength using the *first-stage F-statistic*.  
+
+- Introduce the *Anderson–Rubin (AR)* approach to inference, which remains valid even under weak instruments.  
+
+- Extend the IV framework with *Double Machine Learning for Partially Linear IV Models*, combining residualization and cross-fitting for high-dimensional data.  
+
+### Materials
+- [Slides: Week 7 Instrumental Variable Estimation](./Week%207%20Instrumental%20Variable%20Estimation/Week%207%20Slides.pdf)  
+- [R Code: Double Machine Learning for IV](./Week%207%20Instrumental%20Variable%20Estimation/DoubleMLIV.pdf)
+---
+</details>
+
+<details>
+  <summary><h2>Week 10 Regression Discontinuity Design</h2></summary>
+
+This week introduces the *Regression Discontinuity Design (RDD)*, a powerful quasi-experimental method for causal inference when treatment assignment follows a deterministic rule based on a continuous running variable and a known cutoff. We focus on the *sharp* RDD setup, where treatment status changes discretely at the cutoff, and examine both its theoretical foundations and empirical implementation.  
+
+We begin by formalizing the identifying assumptions of RDD—*continuity of potential outcomes* and *no manipulation* of the running variable—and illustrate these ideas through classic examples such as academic recognition thresholds and close elections. We then derive the local treatment effect at the cutoff, emphasizing *local linear regression* and *kernel weighting* as the core estimation tools.  
+
+Next, we discuss *bandwidth selection* and the Imbens–Kalyanaraman (IK) optimal bandwidth formula, highlighting the bias–variance tradeoff inherent to local estimation. We also examine how incorporating covariates can improve estimation efficiency without affecting bias and extend this idea to *machine learning–assisted RDD*, where nuisance components are estimated flexibly using algorithms such as random forests, gradient boosting, and lasso.  
+
+### Roadmap
+
+- Introduce the *sharp regression discontinuity (RD)* framework and the two core assumptions:  
+  1. *Continuity of potential outcomes* around the cutoff.  
+  2. *No manipulation* of the running variable near the threshold.  
+
+- Define the *local average treatment effect (LATE)* at the cutoff and illustrate its estimation using local linear regression.  
+
+- Explain the *bias–variance tradeoff* and the logic of *kernel weighting* and *bandwidth selection* (Imbens–Kalyanaraman rule).  
+
+- Discuss empirical applications of sharp RD, including:  
+  - *Lee (2008)*: incumbency advantage in close U.S. elections.  
+  - *Lei and Zhou (2022)*: infrastructure investment thresholds in Chinese cities.  
+
+- Demonstrate how to incorporate *covariates* in RDD to improve precision and efficiency.  
+
+- Extend RDD with *machine learning* to estimate nuisance functions, using *cross-fitting* and flexible models (Random Forest, GBM, and Lasso) to residualize outcomes near the cutoff.  
+
+### Materials
+- [Slides: Week 10 Regression Discontinuity Design](./Week%2010%20Regression%20Discontinuity/Week%2010%20Slides.pdf)  
+- [R Code: Machine Learning for RDD](./Week%2010%20Regression%20Discontinuity/MLRDD.pdf)
+---
+</details>
+
+
