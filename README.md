@@ -83,3 +83,27 @@ Building on the Machine Learning methods introduced in the last two weeks, this 
 - [R Code: Fit Double ML Models](./Week%204%20Neyman%20Orthogonality%20and%20Causal%20Inference%20Basics/doubleML.pdf)
 ---
 </details>
+
+<details>
+  <summary><h2>Week 5 Causal Inference from Directed Acyclic Graphs</h2></summary>
+
+Building on last week’s discussion of Neyman Orthogonality and the potential outcome framework, this week introduces the *graphical approach* to causal inference through *Directed Acyclic Graphs (DAGs)*. We connect structural equation modeling (SEM) to modern causal reasoning by showing how DAGs formally represent causal assumptions and clarify identification strategies. This approach allows us to diagnose when and why causal effects can or cannot be identified from observational data.
+
+We begin with a *linear structural equation model* to motivate the transition from equations to DAGs, demonstrating how causal paths encode relationships among treatment, covariates, and outcomes. We then introduce the *backdoor criterion* for identifying confounding and show its equivalence to *conditional ignorability* in the potential outcome framework. Next, we examine *collider bias*—a common pitfall that arises when conditioning on variables influenced by both treatment and outcome—and discuss the distinction between *good* and *bad* controls. Finally, we explore the *front-door criterion*, which enables identification even in the presence of unobserved confounders when a mediating mechanism is observed.
+
+### Roadmap
+
+- Connect *Structural Equation Models (SEM)* to DAGs, showing how causal relationships can be represented graphically and interpreted in terms of directed paths.
+
+- Define the *backdoor criterion* and explain its link to *conditional ignorability* as a condition for causal identification.
+
+- Illustrate *collider bias* and the consequences of conditioning on colliders or post-treatment variables, using examples such as the *birth-weight paradox*.
+
+- Distinguish between *good controls* (confounders) and *bad controls* (colliders, post-treatment variables, or instruments mistakenly adjusted for).
+
+- Introduce the *front-door criterion* as a mechanism-based identification strategy and discuss its assumptions, advantages, and limitations.
+
+### Materials
+- [Slides: Week 5 Causal Inference from Directed Acyclic Graphs](./Week%205%20Causal%20Inference%20through%20DAG/Week%205%20Slides.pdf)
+---
+</details>

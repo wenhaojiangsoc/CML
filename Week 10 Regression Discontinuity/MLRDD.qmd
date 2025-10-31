@@ -1,0 +1,290 @@
+---
+title: "Week 10 Machine Learning for Regression Discontinuity Design"
+format:
+  pdf:
+    pdf-engine: pdflatex 
+    documentclass: article
+    classoption: ["12pt"]
+    geometry: "top=1.1in, bottom=1.1in, left=1.1in, right=1.1in"
+    include-in-header:
+      text: |
+        \DeclareMathOperator*{\argmin}{arg\,min}
+        % fonts, math
+        \usepackage[T1]{fontenc}
+        \usepackage{dsfont}
+        \usepackage{newpxtext}
+        \let\arrowvert\relax
+        \let\Arrowvert\relax
+        \let\mathscr\relax
+        \usepackage{newpxmath}
+        \usepackage{amsmath}
+        \usepackage{bm}
+        
+        % colors
+        \usepackage[dvipsnames]{xcolor}
+        
+        % Indent & line spacing
+        \usepackage{setspace}
+        \setstretch{1.2}
+        \setlength{\parindent}{20pt}
+        \AtBeginDocument{
+        \setlength{\abovedisplayshortskip}{-10pt}
+        \setlength{\belowdisplayshortskip}{3.5pt}
+        }
+        
+        % Figures
+        \usepackage{graphicx}
+        \usepackage{tikz}
+        \usetikzlibrary{arrows.meta, positioning, fit}
+
+        % Equal spacing between Title, Date, Author
+        \makeatletter
+        \renewcommand{\maketitle}{%
+          \begin{center}
+            {\LARGE \bfseries \@title \par}
+            \vspace{0.75em}%
+            {\large \itshape \@date \par}
+            \vspace{0.75em}%
+            {\large \@author \par}
+          \end{center}\par\vspace{1em}
+        }
+        \makeatother
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: source
+---
+
+## Regression Discontinuity
+
+We analyze the effect of the antipoverty program *Progresa/Oportunidades* on the consumption behavior of families in Mexico in the early 2000s.
+
+The program was intended for families in extreme poverty and included financial incentives for participation in measures that improved the family's health, nutrition and children's education. The effect of this program is a widely studied problem in social and economic sciences and, according to the WHO, was a very successful measure in terms of reducing extreme poverty in Mexico.
+
+Eligibility for the program was determined based on a pre-intervention household poverty-index. Individuals above a certain threshold received the treatment (participation in the program) while individuals below the threshold were excluded and recorded as a control group. All observations above the threshold participated in the program, which makes the analysis fall into the standard (sharp) regression discontinuity design.
+
+```{r, load packages, warning=FALSE}
+## load packages
+library(rdrobust)
+library(fastDummies)
+library(randomForest)
+library(hdm)
+library(gbm)
+## install.packages("https://cran.r-project.org/src/contrib/Archive/rdd/rdd_0.57.tar.gz", repos = NULL, type = "source")
+library(rdd)
+```
+
+## Read Data
+
+```{r read data, warning=FALSE}
+## load data
+df <- read.csv("https://raw.githubusercontent.com/CausalAIBook/MetricsMLNotebooks/main/data/progresa.csv",
+               row.names = 1)
+comp <- complete.cases(df)
+df <- df[comp, ]
+```
+
+The data set contains 1,944 observations for which full covariate information of 27 variables is available. We want to measure the local average treatment effect of program participation on four outcome variables. The outcome variables are food and non-food consumption of the recorded families at two points in time, one year and two years after the implementation of the program.
+
+The baseline covariates, recorded prior to program implementation, include the household's size; household head's age, sex, years of education and employment status; spouse's age and years of education; number of children not older than five years and their sex, and physical characteristics of the house: whether the house has cement floors, water connection, water connection inside the house, a bathroom, electricity, number of rooms, pre-intervention consumption, and an identifier of the urban locality in which the house is located.
+
+## Estimation Without Covariates
+
+First, we will perform a very simple RD estimation with a weighted linear regression. We use a triangular kernel, which assigns weights to observations based on their distance from the cutoff point. The weights decrease linearly as the distance from the cutoff point increases.
+
+```{r kernel, warning=FALSE}
+## triangular kernel
+triangular_kernel <- function(index, h) {
+  weights <- 1 - abs(index) / h
+  weights[weights < 0] <- 0
+  return(weights)
+}
+```
+
+The parameter `h` is the bandwidth that controls the range of observations that receive non-zero weights. We use the `IKbandwidth` function from the `rdd` package that implements the *Imbens-Kalyanaraman* method.
+
+$$
+h_{\mathrm{IK}} = C_K 
+\left[
+  \frac{\sigma_+^2 + \sigma_-^2}
+  {nf(c)\,\big( m''_+(c) - m''_-(c) \big)^2}
+\right]^{1/5}
+$$
+
+where $C_K$ is a constant depending on the kernel function. For the triangular kernel, $C_K = 3.4375$.
+
+```{r bandwidth selection, warning=FALSE}
+## Imbens-Kalyanaraman bandwidth
+h <- IKbandwidth(X = df$index, Y = df$conspcfood_t1, cutpoint = 0)
+```
+
+We use the triangular kernel function to calculate weights for each observation. After that, we can fit two separate linear regressions for both treatment and control groups.
+
+```{r RD manual, warning=FALSE}
+## manually calculate \tau at cutoff
+weights <- triangular_kernel(df$index, h)
+model_treated <- lm(conspcfood_t1 ~ index, data = df[df$index > 0, ], weights = weights[df$index > 0])
+model_control <- lm(conspcfood_t1 ~ index, data = df[df$index < 0, ], weights = weights[df$index < 0])
+
+## predict counterfactual at cutoff
+cutoff <- 0
+treatment_effect <- predict(model_treated, newdata = data.frame(index = cutoff)) -
+  predict(model_control, newdata = data.frame(index = cutoff))
+treatment_effect
+```
+
+We estimate that the participation in the program reduced food consumption by  22.1  units in the first year after the intervention. We can repeat the estimation using the rdd package, which yields us an estimate as well as a confidence band calculated according to the formulas presented in the book. We look at all four targets.
+
+```{r function RD, warning=FALSE}
+result <- c()
+for (outcome in c("conspcfood_t1", "conspcnonfood_t1", "conspcfood_t2", "conspcnonfood_t2")) {
+  rdd_result <- rdrobust(df[[outcome]], df$index, c = cutoff, rho = 1,
+                         weights = df$weights)
+  result <- rbind(result, c(rdd_result$coef[1], rdd_result$se["Robust", ]))
+}
+resframe <- as.data.frame(result)
+colnames(resframe) <- c("LATE", "s.e.")
+rownames(resframe) <- c("Food T_1", "Non-Food T_1", "Food T_2", "Non-Food T_2")
+print(resframe)
+
+```
+## Estimation with Covariates
+
+For identification and estimation of the average treatment effect at the cutoff value no covariate information is required except the running variable, but nevertheless in many applications additional covariates are collected which might be exploited for the analysis for efficiency reasons. The standard approach is simply to take up the regressors in the weighted least squares regression.
+
+```{r including covariates, warning=FALSE}
+
+## specify linear model
+model_treated <- lm(conspcfood_t1 ~ index + hhownhouse + headage + heademp + headeduc,
+                    data = df[df$index > 0, ], weights = weights[df$index > 0])
+model_control <- lm(conspcfood_t1 ~ index + hhownhouse + headage + heademp + headeduc,
+                    data = df[df$index < 0, ], weights = weights[df$index < 0])
+prediction_treated <- predict(model_treated, newdata = data.frame(
+  index = cutoff,
+  hhownhouse = weighted.mean(df[df$index > 0, ]$hhownhouse, w = weights[df$index > 0]),
+  headage = weighted.mean(df[df$index > 0, ]$headage, w = weights[df$index > 0]),
+  heademp = weighted.mean(df[df$index > 0, ]$heademp, w = weights[df$index > 0]),
+  headeduc = weighted.mean(df[df$index > 0, ]$headeduc, w = weights[df$index > 0])
+))
+prediction_control <- predict(model_control, newdata = data.frame(
+  index = cutoff,
+  hhownhouse = weighted.mean(df[df$index < 0, ]$hhownhouse, w = weights[df$index < 0]),
+  headage = weighted.mean(df[df$index < 0, ]$headage, w = weights[df$index < 0]),
+  heademp = weighted.mean(df[df$index < 0, ]$heademp, w = weights[df$index < 0]),
+  headeduc = weighted.mean(df[df$index < 0, ]$headeduc, w = weights[df$index < 0])
+))
+treatment_effect <- prediction_treated - prediction_control
+treatment_effect
+
+## rdrobust can also include covariates
+result <- c()
+for (outcome in c("conspcfood_t1", "conspcnonfood_t1", "conspcfood_t2", "conspcnonfood_t2")) {
+  rdd_result <- rdrobust(df[[outcome]], df$index, c = cutoff, rho = 1, covs = df[, c(1:8, 10:17, 19, 22)])
+  result <- rbind(result, c(rdd_result$coef[1], rdd_result$se["Robust", ]))
+}
+resframe_adj <- as.data.frame(result)
+colnames(resframe_adj) <- c("LATE", "s.e.")
+rownames(resframe_adj) <- c("Food T_1", "Non-Food T_1", "Food T_2", "Non-Food T_2")
+resframe_adj["% reduction"] <- (resframe_adj["s.e."] - resframe[, 2]) * 100 / resframe[, 2]
+print(resframe_adj)
+```
+
+## Estimation of the Nuisance Function by Machine Learning
+
+```{r}
+## running Variable and Outcome
+df_ml <- df
+investigated_outcome <- "conspcfood_t2"
+names(df_ml)[names(df_ml) == "index"] <- "X"
+names(df_ml)[names(df_ml) == investigated_outcome] <- "Y"
+
+## baseline covariates including consumption
+b_covs <- names(df_ml[, c(1:8, 10:17, 19, 22)])
+
+## fixed effects for localities
+i_fe <- as.matrix(dummy_cols(df_ml$clus, remove_first_dummy = TRUE))
+
+## flexible covariates including localities indicators
+f_covs <- as.matrix(model.matrix(~ .^2, data = df_ml[b_covs]))[, -1]
+
+## we also define a bandwidth using IK
+h_fs <- 2 * h
+```
+
+```{r}
+first_stage <- function() {
+  
+  ## set up the cross-fitting
+  n <- nrow(df_ml)
+  Kf <- 5 # number of folds
+  sampleframe <- rep(1:Kf, ceiling(n / Kf))
+  cfgroup <- sample(sampleframe, size = n, replace = FALSE)
+
+  ## matrix to store eta predictions
+  eta_fit <- matrix(NA, n, 3)
+
+  ## create vector of observations to be considered in the first stage model
+  weights <- (abs(df_ml$X) < h_fs)
+
+  for (k in 1:Kf) {
+    
+    ## the fold to be predicted
+    fold <- (cfgroup == k)
+    data_fold <- df_ml[fold, ]
+  
+    ## the remaining folds used in training
+    data_treated <- df_ml[which(df_ml$X > 0 & !fold & weights > 0), ]
+    data_control <- df_ml[which(df_ml$X < 0 & !fold & weights > 0), ]
+    
+    ## specify the model
+    model <- as.formula(paste("Y~", paste(b_covs, collapse = "+")))
+
+    ## randome forest
+    rf1 <- randomForest(model, data = data_treated, mtry = 4, ntree = 1000)
+    rf0 <- randomForest(model, data = data_control, mtry = 4, ntree = 1000)
+    eta_fit[fold, 1] <- (predict(rf1, data_fold) + predict(rf0, data_fold)) / 2
+    
+    ## gradient bootsting
+    gbm1 <- gbm(model,
+      data = data_treated, n.trees = 100, interaction.depth = 1,
+      shrinkage = .1, distribution = "gaussian"
+    )
+    gbm0 <- gbm(model,
+      data = data_control, n.trees = 100, interaction.depth = 1,
+      shrinkage = .1, distribution = "gaussian"
+    )
+    eta_fit[fold, 2] <- (predict(gbm1, data_fold, n.trees = 100) + predict(gbm0, data_fold, n.trees = 100)) / 2
+
+    ## lasso
+    las_base1 <- rlasso(model, data = data_treated)
+    las_base0 <- rlasso(model, data = data_control)
+    eta_fit[fold, 3] <- (predict(las_base1, data_fold) + predict(las_base0, data_fold)) / 2
+  }
+  return(eta_fit)
+}
+
+eta_fit <- first_stage()
+```
+
+```{r}
+methods <- c("Random Forest", "Gradient Boosting", "Lasso")
+
+## create the residualized Y
+second_stage <- function(eta_fit) {
+  adj_results <- NULL
+
+  for (i in seq_along(methods)) {
+    m_y <- df_ml$Y - eta_fit[, i]
+    rdd_result <- rdrobust(m_y, df$index, c = cutoff, rho = 1)
+    adj_results <- rbind(adj_results, c(rdd_result$coef[1], rdd_result$se["Robust", ]))
+  }
+  return(adj_results)
+}
+
+## print results
+adj_frame <- as.data.frame(second_stage(eta_fit))
+rownames(adj_frame) <- methods
+colnames(adj_frame) <- c("LATE", "s.e.")
+print(adj_frame)
+```
