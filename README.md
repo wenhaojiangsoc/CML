@@ -107,3 +107,33 @@ We begin with a *linear structural equation model* to motivate the transition fr
 - [Slides: Week 5 Causal Inference from Directed Acyclic Graphs](./Week%205%20Causal%20Inference%20through%20DAG/Week%205%20Slides.pdf)
 ---
 </details>
+
+<details>
+  <summary><h2>Week 6 Matching, Propensity, Weighting, and Doubly Robust Estimation</h2></summary>
+
+This week focuses on causal inference under the *Conditional Ignorability Assumption (CIA)* and explores various strategies for covariate adjustment. We examine how *matching*, *propensity score weighting*, and *regression adjustment* provide alternative approaches for estimating treatment effects from observational data, and how these methods relate to the *potential outcome framework* introduced earlier.  
+
+We begin with *matching* and *regression-based estimands*, showing how both aim to eliminate selection bias by conditioning on observed covariates. We then formalize the *propensity score theorem*, which reduces high-dimensional covariate adjustment to a single scalar—the probability of treatment given covariates. Using this foundation, we introduce *Inverse Probability Weighting (IPW)* and its stabilized variant (*SIPW*) to construct pseudo-populations that mimic random treatment assignment.  
+
+Finally, we study *Augmented Inverse Probability Weighting (AIPW)*, a *doubly robust* estimator that remains consistent if either the outcome model or the propensity model is correctly specified. We close by linking AIPW back to *Neyman Orthogonality*, illustrating how double robustness prepares the ground for modern *Double Machine Learning* approaches.
+
+### Roadmap
+
+- Review the *Conditional Ignorability Assumption (CIA)* and discuss how matching and regression estimators address selection bias under ignorability.
+
+- Introduce the *propensity score theorem*, demonstrating how causal identification can rely on a single balancing score rather than the full covariate vector.
+
+- Derive the *Inverse Probability Weighting (IPW)* estimator and explore its relation to weighted regression and the Horvitz–Thompson formulation.
+
+- Explain *Stabilized IPW (SIPW)* and how stabilization mitigates extreme weights and reduces estimator variance.
+
+- Introduce *G-computation* as an alternative adjustment method based on outcome modeling.
+
+- Present the *Augmented Inverse Probability Weighting (AIPW)* estimator, emphasizing its *double robustness* and connection to *Neyman Orthogonality*, which forms the theoretical bridge to *Double Machine Learning*.
+
+### Materials
+- [Slides: Week 6 Matching, Propensity, Weighting, and Beyond](./Week%206%20Matching%2C%20Propensity%2C%20Weighting/Week%206%20Slides.pdf)  
+- [R Code: PSweight Demonstration](./Week%206%20Matching%2C%20Propensity%2C%20Weighting/PSweight.pdf)
+---
+</details>
+
