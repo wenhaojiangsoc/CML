@@ -1,0 +1,204 @@
+---
+title: "\\textbf{Causal Machine Learning: Homework 4}"
+subtitle: "\\textit{Due date}: Dec 3, 11:59PM"
+author: "Your name:"
+format:
+  pdf:
+    pdf-engine: pdflatex 
+    documentclass: article
+    classoption: ["12pt"]
+    geometry: "top=1.1in, bottom=1.1in, left=1.1in, right=1.1in"
+    include-in-header:
+      text: |
+        \DeclareMathOperator*{\argmin}{arg\,min}
+        % fonts, math
+        \usepackage[T1]{fontenc}
+        \usepackage{dsfont}
+        \usepackage{newpxtext}
+        \let\arrowvert\relax
+        \let\Arrowvert\relax
+        \let\mathscr\relax
+        \usepackage{newpxmath}
+        \usepackage{amsmath}
+        \usepackage{bm}
+        
+        % colors
+        \usepackage[dvipsnames]{xcolor}
+        
+        % Indent & line spacing
+        \usepackage{setspace}
+        \setstretch{1.2}
+        \setlength{\parindent}{20pt}
+        \AtBeginDocument{
+        \setlength{\abovedisplayshortskip}{-10pt}
+        \setlength{\belowdisplayshortskip}{3.5pt}
+        }
+        
+        % Figures
+        \usepackage{graphicx}
+        \usepackage{tikz}
+        \usetikzlibrary{arrows.meta, positioning, fit}
+
+        % Equal spacing between Title, Date, Author
+        \makeatletter
+        \renewcommand{\maketitle}{%
+          \begin{center}
+            {\LARGE \bfseries \@title \par}
+            \vspace{0.75em}%
+            {\large \itshape \@date \par}
+            \vspace{0.75em}%
+            {\large \@author \par}
+          \end{center}\par\vspace{1em}
+        }
+        \makeatother
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: source
+---
+
+# Regression Discontinuity Design
+
+We showed in lecture that the Average Treatment Effect (ATE) of a *fuzzy* Regression Discontinuity (RD) design is defined as
+
+$$
+\tau = 
+\frac{\lim_{x \downarrow c} E[Y_i \mid X_i = x] - \lim_{x \uparrow c} E[Y_i \mid X_i = x]}
+{\lim_{x \downarrow c} E[D_i \mid X_i = x] - \lim_{x \uparrow c} E[D_i \mid X_i = x]}.
+$$
+
+Both the numerator and denominator have the same functional form as in a *sharp* RD design and can therefore be estimated using a similar parametric approach.  
+
+In lecture, we defined $Z_i = \mathds{1}(X_i \geq c)$ and used a local *first-order* (linear) regression for both the numerator and denominator. Specifically, for the numerator, we estimated
+
+$$
+Y_i = \alpha_Y + \beta_Y Z_i + \gamma_Y (X_i - c) + \eta_Y Z_i (X_i - c) + \epsilon_i
+$$
+
+and used a symmetric specification for the denominator. The ATE is defined as
+
+$$
+\hat{\tau} = \frac{\hat{\beta}_Y}{\hat{\beta}_D}
+$$
+
+1. There may be reason to believe that the relationship between the running variable $X_i$ and the outcome $Y_i$ is not strictly linear. Write the specification for the numerator if we wish to use a *second-order* (quadratic) local regression.
+
+2. Briefly explain what $\hat{\beta}_Y$ estimates in your specification.
+
+3. Now I want you to re-estimate the effect of the antipoverty program *Progresa/Oportunidades* on the consumption behavior of families in Mexico that we demonstrated in lecture. The goal is to refit the data using a *second-order* (quadratic) local regression. The dependent variable is consumption of all goods in time 2 `conspc_t2`, and we use the standard Imbens-Kalyanaraman bandwidth. I want you to use a uniform kernel, that is, all individuals within the bandwidth receive equal weights. The running variable is `index`, and the cutoff is 0. I additionally dropped outliers in the data.
+
+```{r, load packages and read data, warning=FALSE, message=FALSE}
+## load packages
+library(rdrobust)
+library(randomForest)
+library(rdd)
+
+## load data
+df <- read.csv("https://raw.githubusercontent.com/CausalAIBook/MetricsMLNotebooks/main/data/progresa.csv",
+               row.names = 1)
+comp <- complete.cases(df)
+df <- df[comp, ]
+
+## Imbens-Kalyanaraman bandwidth
+h <- IKbandwidth(X = df$index, Y = df$conspcfood_t2, cutpoint = 0)
+
+## drop outliers 
+df <- df[df$conspc_t2<2000,]
+```
+
+(a) Plot the distribution of the outcome `conspc_t2` at both sides of the cutoff within bandwidth using `geom_point()`. In the same figure, additionally draw the fitted quadratic regression line at both sides respectively. Briefly describe your initial finding from the plot.
+
+(b) Report your point estimation of the local ATE of the program on consumption `conspc_t2` at the cutoff. I want you to manually fit a regression on both sides using `lm()`.
+
+(c) Now I want you to use DML to control for covariates and re-fit the residualized outcome using quadratic linear regression. Specifically, please use the same controls as in `MLRDD.qmd` file, that is, `df[, c(1:8, 10:17, 19, 22)]`. Use 5 folds for cross-fitting, Random Forest for the estimation of the nuisance function with default selection of hyperparameters such as `ntree`, and separate estimation of the nuisance function at the two sides of the cutoff.
+
+Report your point estimation with robust standard error using the function `rdrobust()` with parameter `p=2` for quadratic linear regression estimation. What can you conclude from your final estimation? (hint: you may refer to the `.qmd` file in lecture for details.)
+
+# Difference-in-Differences Using DML
+
+1. Write the score function $\psi(\cdot)$ used in conditional Difference-in-Differences that targets the Average Treatment Effect on the Treated (ATT). Explain the meaning of each variable or function in the score function. (Hint: check slide 50.)
+
+2. Derive the target estimate of ATT $\theta$ based on the *population* moment condition $E[\psi(\cdot)] = 0$.
+
+3. Revisit our example of minimum wage change and teen employment rate at the county level in lecture, but this time estimate the ATT using conditional DiD for the treatment that happened in 2005. Prior to 2005, no counties in the revised data raised their minimum wages. Estimate the 2 by 2 DiD, where control units are defined as those never treated or not yet treated in or after 2005, and treated units are those treated in 2005. Use 2004 as the pre-treatment reference period, and estimate the ATT in 2005 (immediate effect) as well as in 2006 and 2007 (slightly longer term). By design, the number of control units decreases over time. Data operations are done below.
+
+```{r read and process data, message=FALSE}
+library(data.table)
+library(BMisc)
+library(glmnet)
+library(randomForest)
+library(rpart)
+library(xtable)
+library(dplyr)
+
+## read data
+data <- read.csv("https://raw.githubusercontent.com/CausalAIBook/MetricsMLNotebooks/main/data/minwage_data.csv",
+                 row.names = 1)
+data <- data.table(data)
+
+## include never treated and those that have not been treated until 2005
+data <- subset(data, (G == 0) | (G > 2004))
+data <- data[, -c(
+  "countyreal", "state_name", "FIPS", "emp0A01_BS",
+  "quarter", "censusdiv", "pop", "annual_avg_pay",
+  "state_mw", "fed_mw", "ever_treated"
+)]
+
+## get baseline controls from 2001 for both treated and control units
+treat1 <- subset(data, (G == 2005) & (year == 2001)) %>%
+  select(-c("year", "G", "region", "treated")) 
+cont1 <- subset(data, (G == 0 | G > 2004) & (year == 2001)) %>%
+  select(-c("year", "G", "region", "treated")) 
+
+## define treated and control units in each year
+treat4 <- subset(data, (G == 2005) & (year == 2004))
+treat5 <- subset(data, (G == 2005) & (year == 2005))
+treat6 <- subset(data, (G == 2005) & (year == 2006))
+treat7 <- subset(data, (G == 2005) & (year == 2007))
+cont4 <- subset(data, (G == 0 | G > 2005) & (year == 2004)) ## not yet or never treated in year 2004
+cont5 <- subset(data, (G == 0 | G >= 2006) & (year == 2005)) ## not yet or never treated in year 2005
+cont6 <- subset(data, (G == 0 | G >= 2007) & (year == 2006)) ## not yet or never treated in year 2006
+cont7 <- subset(data, (G == 0 | G >= 2008) & (year == 2007)) ## not yet or never treated in year 2007
+
+## merge with baseline covariates
+treatB <- merge(treat4, treat1, by = "id", suffixes = c(".pre", ".0"))
+treatB <- treatB[, -c("treated", "lpop.pre", "lavg_pay.pre", "year", "G")]
+contB <- merge(cont4, cont1, by = "id", suffixes = c(".pre", ".0"))
+contB <- contB[, -c("treated", "lpop.pre", "lavg_pay.pre", "year", "G")]
+
+## create Delta Y for treated and controlled
+treat5 <- treat5[, -c("lpop", "lavg_pay", "year", "G", "region")]
+treat6 <- treat6[, -c("lpop", "lavg_pay", "year", "G", "region")]
+treat7 <- treat7[, -c("lpop", "lavg_pay", "year", "G", "region")]
+cont5 <- cont5[, -c("lpop", "lavg_pay", "year", "G", "region")]
+cont6 <- cont6[, -c("lpop", "lavg_pay", "year", "G", "region")]
+cont7 <- cont7[, -c("lpop", "lavg_pay", "year", "G", "region")]
+
+## calculate Delta Y for treated and controlled units
+tdid05 <- merge(treat5, treatB, by = "id") %>%
+  mutate(dy=lemp-lemp.pre) %>%
+  select(-c("id", "lemp", "lemp.pre"))
+tdid06 <- merge(treat6, treatB, by = "id") %>%
+  mutate(dy=lemp-lemp.pre) %>%
+  select(-c("id", "lemp", "lemp.pre"))
+tdid07 <- merge(treat7, treatB, by = "id") %>%
+  mutate(dy=lemp-lemp.pre) %>%
+  select(-c("id", "lemp", "lemp.pre"))
+
+cdid05 <- merge(cont5, contB, by = "id") %>%
+  mutate(dy=lemp-lemp.pre) %>%
+  select(-c("id", "lemp", "lemp.pre"))
+cdid06 <- merge(cont6, contB, by = "id") %>%
+  mutate(dy=lemp-lemp.pre) %>%
+  select(-c("id", "lemp", "lemp.pre"))
+cdid07 <- merge(cont7, contB, by = "id") %>%
+  mutate(dy=lemp-lemp.pre) %>%
+  select(-c("id", "lemp", "lemp.pre"))
+```
+
+Follow the same DML procedure as in `DMLforDiD.qmd`, but this time use *only* Random Forest with `mtry = 4` and `ntree = 1000` to estimate the two nuisance functions. Use 5 folds for cross-fitting. The control variables are `region`, `lemp.0`, `lpop.0`, and `lavg_pay.0`. Trim very large propensity scores (> 0.95) to 0.95 and very small ones (< 0.05) to 0.05. As a comparison, also include an estimation *without* using any controls.
+
+(a) Report your point estimates of the ATT in 2005, 2006, and 2007, along with their standard errors, for both models: the one without controls and the one using Random Forest with controls (`region`, `lemp.0`, `lpop.0`, and `lavg_pay.0`). Briefly compare the results for the two models and describe the possible reason(s) for their difference.
+
+(b) Based on your estimation results, discuss what you can conclude about the relationship between minimum wage increases and teen employment.

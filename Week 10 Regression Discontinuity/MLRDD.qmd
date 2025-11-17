@@ -67,6 +67,7 @@ Eligibility for the program was determined based on a pre-intervention household
 ```{r, load packages, warning=FALSE}
 ## load packages
 library(rdrobust)
+library(rddensity)
 library(fastDummies)
 library(randomForest)
 library(hdm)
@@ -132,6 +133,11 @@ cutoff <- 0
 treatment_effect <- predict(model_treated, newdata = data.frame(index = cutoff)) -
   predict(model_control, newdata = data.frame(index = cutoff))
 treatment_effect
+
+## McCracy test
+density_test <- rddensity(X = df$index, c = cutoff)
+summary(density_test)
+rdplotdensity(rdd = density_test, X = df$index)
 ```
 
 We estimate that the participation in the program reduced food consumption by  22.1  units in the first year after the intervention. We can repeat the estimation using the rdd package, which yields us an estimate as well as a confidence band calculated according to the formulas presented in the book. We look at all four targets.
@@ -147,7 +153,6 @@ resframe <- as.data.frame(result)
 colnames(resframe) <- c("LATE", "s.e.")
 rownames(resframe) <- c("Food T_1", "Non-Food T_1", "Food T_2", "Non-Food T_2")
 print(resframe)
-
 ```
 ## Estimation with Covariates
 

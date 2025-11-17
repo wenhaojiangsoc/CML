@@ -1,0 +1,200 @@
+---
+title: "Controls for IV Estimation"
+format:
+  pdf:
+    pdf-engine: pdflatex 
+    documentclass: article
+    classoption: ["12pt"]
+    geometry: "top=1.1in, bottom=1.1in, left=1.1in, right=1.1in"
+    include-in-header:
+      text: |
+        \DeclareMathOperator*{\argmin}{arg\,min}
+        % fonts, math
+        \usepackage[T1]{fontenc}
+        \usepackage{dsfont}
+        \usepackage{newpxtext}
+        \let\arrowvert\relax
+        \let\Arrowvert\relax
+        \let\mathscr\relax
+        \usepackage{newpxmath}
+        \usepackage{amsmath}
+        \usepackage{bm}
+        
+        % colors
+        \usepackage[dvipsnames]{xcolor}
+        
+        % Indent & line spacing
+        \usepackage{setspace}
+        \setstretch{1.2}
+        \setlength{\parindent}{20pt}
+        \AtBeginDocument{
+        \setlength{\abovedisplayshortskip}{-10pt}
+        \setlength{\belowdisplayshortskip}{3.5pt}
+        }
+        
+        % Figures
+        \usepackage{graphicx}
+        \usepackage{tikz}
+        \usetikzlibrary{arrows.meta, positioning, fit}
+
+        % Equal spacing between Title, Date, Author
+        \makeatletter
+        \renewcommand{\maketitle}{%
+          \begin{center}
+            {\LARGE \bfseries \@title \par}
+            \vspace{0.75em}%
+            {\large \itshape \@date \par}
+            \vspace{0.75em}%
+            {\large \@author \par}
+          \end{center}\par\vspace{1em}
+        }
+        \makeatother
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: source
+---
+
+## Validity of Instrumental Variable in the Special Case
+
+In Assignment 3, we have a special scenario where there is an unobserved $V$ that affects $D$ and $Z$ (left panel). Can $Z$ be a valid instrument? Here I simulate the DGP and check the property of the estimate. Note the true $\beta$ in the DGP is 5.
+
+\begin{center}
+\begin{tikzpicture}[
+>=stealth,
+scale=0.65,
+thick,
+every node/.style={scale=1.1},
+]
+
+% nodes
+\node (D) at (8,0) {$D$};
+\node[circle,draw,dashed,inner sep=2pt] (U) at (9.5,-2.5) {$U$};
+\node (Y) at (11,0) {$Y$};
+\node[circle,draw,dashed,inner sep=2pt] (V) at (5,0) {$V$};
+\node (Z) at (6.5,2.5) {$Z$};
+\node (X) at (9.5,2.5) {$X$};
+
+% arrows
+\draw[->] (Z) -- (D);
+\draw[->] (D) -- (Y);
+\draw[->] (U) -- (D);
+\draw[->] (U) -- (Y);
+\draw[->] (V) -- (Z);
+\draw[->] (V) -- (D);
+\draw[->] (X) -- (D);
+\draw[->] (X) -- (Y);
+
+% nodes
+\node (D) at (16,0) {$D$};
+\node[circle,draw,dashed,inner sep=2pt] (U) at (17.5,-2.5) {$U$};
+\node (Y) at (19,0) {$Y$};
+\node[circle,draw,dashed,inner sep=2pt] (V) at (13,0) {$V$};
+\node (Z) at (14.5,2.5) {$Z$};
+\node (X) at (17.5,2.5) {$X$};
+
+% arrows
+\draw[->] (D) -- (Y);
+\draw[->] (U) -- (D);
+\draw[->] (U) -- (Y);
+\draw[->] (V) -- (Z);
+\draw[->] (V) -- (D);
+\draw[->] (X) -- (D);
+\draw[->] (X) -- (Y);
+\end{tikzpicture}
+\end{center}
+
+```{r simulation DGP 1, message=FALSE}
+library(AER)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+set.seed(1)
+
+## run simulation for 200 times
+results <-
+  data.frame(iteration=1:200,
+           OLS=rep(NA,200),
+           IV=rep(NA,200))
+for (i in 1:200){
+  
+  ## define unobserved
+  V <- rnorm(1000, mean=3, sd=1)
+  U <- rnorm(1000, mean=-2, sd=3)
+  
+  ## define observed
+  Z <- 1 * V + runif(1000, min=0, max=2) + rnorm(1000, mean=0, sd=2)
+  X <- rnorm(1000, mean=5, sd=3) + rnorm(1000, mean=0, sd=1)
+  D <- -5 * V + 2 * Z + 0.5 * U + 1 * X + rnorm(1000, mean=0, sd=1)
+  Y <- 5 * D + 1 * X + 2 * U + rnorm(1000, mean=0, sd=1)
+  
+  ## save results
+  results[i,"OLS"] <- summary(lm(Y ~ D + X))$coef[2,1]
+  results[i,"IV"] <- summary(ivreg(Y ~ X + D | X + Z))$coef[3,1]
+}
+
+## plot distribution
+results %>%
+  pivot_longer(c(OLS, IV), names_to = "Method", values_to = "Coefficient") %>%
+  group_by(Method) %>%
+  mutate(mean_coef = mean(Coefficient)) %>%
+  ggplot(aes(x = Coefficient, fill = Method)) +
+  geom_density(alpha = 0.4) +
+  geom_vline(aes(xintercept = mean_coef, color = Method),
+             linetype = "dashed", size = 1) +
+  labs(title = "Distribution of Simulated Coefficients",
+       x = "Coefficient", y = "Density") +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text()
+  )
+```
+
+The simulation results show that you don't have to control for $V$ (it is unobserved in any case) or $X$ ($X$ does not affect $Z$) to use $Z$ as a valid IV, as long as $V$ does not affect $Y$.
+
+Now what about another scenario where the relationship between $Z$ and $D$ is completely driven by unobserved $V$, as in the right panel? Yes you still can!
+
+```{r simulation DGP 2, message=FALSE}
+set.seed(1)
+
+## run simulation for 200 times
+results <-
+  data.frame(iteration=1:200,
+           OLS=rep(NA,200),
+           IV=rep(NA,200))
+for (i in 1:200){
+  
+  ## define unobserved
+  V <- rnorm(1000, mean=3, sd=1)
+  U <- rnorm(1000, mean=-2, sd=3)
+  
+  ## define observed
+  Z <- 1 * V + runif(1000, min=0, max=2) + rnorm(1000, mean=0, sd=2)
+  X <- rnorm(1000, mean=5, sd=3) + rnorm(1000, mean=0, sd=1)
+  D <- -5 * V + 0.5 * U + 1 * X + rnorm(1000, mean=0, sd=1)
+  Y <- 5 * D + 1 * X + 2 * U + rnorm(1000, mean=0, sd=1)
+  
+  ## save results
+  results[i,"OLS"] <- summary(lm(Y ~ D + X))$coef[2,1]
+  results[i,"IV"] <- summary(ivreg(Y ~ X + D | X + Z))$coef[3,1]
+}
+
+## plot distribution
+results %>%
+  pivot_longer(c(OLS, IV), names_to = "Method", values_to = "Coefficient") %>%
+  group_by(Method) %>%
+  mutate(mean_coef = mean(Coefficient)) %>%
+  ggplot(aes(x = Coefficient, fill = Method)) +
+  geom_density(alpha = 0.4) +
+  geom_vline(aes(xintercept = mean_coef, color = Method),
+             linetype = "dashed", size = 1) +
+  labs(title = "Distribution of Simulated Coefficients",
+       x = "Coefficient", y = "Density") +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text()
+  )
+```

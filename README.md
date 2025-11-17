@@ -173,23 +173,19 @@ We illustrate these concepts through two canonical applications: *settler mortal
 <details>
   <summary><h2>Week 10 Regression Discontinuity Design</h2></summary>
 
-This week introduces the *Regression Discontinuity Design (RDD)*, a powerful quasi-experimental method for causal inference when treatment assignment follows a deterministic rule based on a continuous running variable and a known cutoff. We focus on the *sharp* RDD setup, where treatment status changes discretely at the cutoff, and examine both its theoretical foundations and empirical implementation.  
+This week introduces the *Regression Discontinuity Design (RDD)*, a quasi-experimental method that identifies causal effects at known treatment thresholds. We begin with the *sharp* RDD, where treatment assignment is fully determined by a cutoff in the running variable, and extend to *fuzzy* RDD, where treatment probability changes discontinuously. The design’s power lies in its local randomization property near the cutoff, allowing causal inference without full ignorability.
 
-We begin by formalizing the identifying assumptions of RDD—*continuity of potential outcomes* and *no manipulation* of the running variable—and illustrate these ideas through classic examples such as academic recognition thresholds and close elections. We then derive the local treatment effect at the cutoff, emphasizing *local linear regression* and *kernel weighting* as the core estimation tools.  
+We then cover essential estimation techniques—*local linear regression*, *kernel weighting*, and optimal *bandwidth selection* using the *Imbens–Kalyanaraman (IK)* rule—along with the interpretation of *local average treatment effects (LATE)*. We discuss empirical examples such as *Lee (2008)* on electoral incumbency and *Lei & Zhou (2022)* on infrastructure investment thresholds.
 
-Next, we discuss *bandwidth selection* and the Imbens–Kalyanaraman (IK) optimal bandwidth formula, highlighting the bias–variance tradeoff inherent to local estimation. We also examine how incorporating covariates can improve estimation efficiency without affecting bias and extend this idea to *machine learning–assisted RDD*, where nuisance components are estimated flexibly using algorithms such as random forests, gradient boosting, and lasso.  
+Finally, we emphasize *covariate adjustment* and *Machine Learning–assisted RDD*. By residualizing outcomes using ML algorithms such as *Random Forest*, *Gradient Boosting*, and *Lasso*, we flexibly estimate nuisance functions and improve efficiency without introducing bias. This approach connects RDD to *Double Machine Learning (DML)* principles—using cross-fitting to ensure valid inference when high-dimensional covariates are present.
 
 ### Roadmap
 
-- Introduce the *sharp regression discontinuity (RD)* framework and the two core assumptions.  
-
-- Define the *local average treatment effect (LATE)* at the cutoff and illustrate its estimation using local linear regression. We illustrate the use of RD by discussing several empirical applications.
-
-- Explain the *bias–variance tradeoff* and the logic of *kernel weighting* and *bandwidth selection* (Imbens–Kalyanaraman rule).  
-
-- Demonstrate how to incorporate *covariates* in RDD to improve precision and efficiency.  
-
-- Extend RDD with *machine learning* to estimate nuisance functions, using *cross-fitting* and flexible models (Random Forest, GBM, and Lasso) to residualize outcomes near the cutoff.  
+- Review *sharp* and *fuzzy* RDD frameworks and key assumptions: continuity and no manipulation.  
+- Derive the *local average treatment effect (LATE)* and implement estimation via *local linear regression* and *kernel weighting*.  
+- Explain the *bias–variance tradeoff* and optimal *bandwidth selection* (Imbens–Kalyanaraman rule).  
+- Introduce *covariate control* for efficiency gains, and show how nuisance functions can be estimated using *Machine Learning*.  
+- Demonstrate *ML-based RDD* using the *Progresa/Oportunidades* dataset: cross-fitted *Random Forest*, *GBM*, and *Lasso* residualization within bandwidth neighborhoods of the cutoff.  
 
 ### Materials
 - [Slides: Week 10 Regression Discontinuity Design](./Week%2010%20Regression%20Discontinuity/Week%2010%20Slides.pdf)  
@@ -197,4 +193,26 @@ Next, we discuss *bandwidth selection* and the Imbens–Kalyanaraman (IK) optima
 ---
 </details>
 
+<details>
+  <summary><h2>Week 11 Difference-in-Differences</h2></summary>
+
+This week introduces the *Difference-in-Differences (DiD)* framework and its modern extensions using *panel data* and *machine learning*. We begin with the classic two-way fixed-effects (TWFE) model as the foundation for panel data analysis, showing how differencing removes time-invariant unobserved heterogeneity. We then formalize the *parallel trends* and *no anticipation* assumptions necessary for causal identification in DiD.  
+
+We illustrate how the canonical 2×2 DiD estimator arises as a special case of TWFE, and extend to *staggered treatment timing*, highlighting decomposition results from *Goodman-Bacon (2021)* and *de Chaisemartin and D’Haultfoeuille (2020)*. We also discuss robustness issues, such as violations of parallel trends and the inclusion of lagged dependent variables to address dynamic confounding.  
+
+In the coding component, we implement *Double Machine Learning (DML) for Conditional DiD*, following *Callaway and Sant’Anna (2021)*. Using county-level U.S. data on minimum wage changes (2001–2007), we estimate the average treatment effect on the treated (ATT) via cross-fitting. The DML algorithm flexibly estimates nuisance components—propensity scores and outcome regressions—using a variety of learners including *Lasso*, *Ridge*, *Random Forest*, and decision trees. This approach allows valid inference even with high-dimensional covariates, ensuring robustness under conditional parallel trends.
+
+### Roadmap
+
+- Introduce *panel data* and the *two-way fixed-effects (TWFE)* model as a baseline for causal inference with time variation.    
+- Compare TWFE with the *Lagged Dependent Variable (LDV)* approach and discuss the Nickell bias.  
+- Define the *Difference-in-Differences (DiD)* estimator and its key assumptions (*parallel trends* and *no anticipation*).  
+- Connect TWFE and DiD frameworks; discuss *Goodman-Bacon (2021)*’s decomposition and challenges under staggered treatment timing.
+- Implement *Conditional DiD with Double Machine Learning (DML)*: cross-fitting and orthogonalization for ATT estimation using ML learners.  
+
+### Materials
+- [Slides: Week 11 Difference-in-Differences](./Week%2011%20Difference-in-Differences/Week%2011%20Slides.pdf)  
+- [R Code: DML for Conditional DiD](./Week%2011%20Difference-in-Differences/DMLforDiD.pdf)
+---
+</details>
 
