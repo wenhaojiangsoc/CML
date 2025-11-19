@@ -1,5 +1,5 @@
 ---
-title: "Week 11 DML for Conditional Average Treatment Effect"
+title: "Week 12 and 13 DML for Conditional Average Treatment Effect"
 format:
   pdf:
     pdf-engine: pdflatex 
@@ -57,10 +57,9 @@ editor: source
 ---
 
 
-We demonstrate the use of Double Machine Learning to estimate the Conditional Average Treatment Effect. The goal of the example is to estimate the effect of 401(k) eligibility on net financial assets for each value of income.
+We demonstrate the use of Double Machine Learning to estimate the Conditional Average Treatment Effect. The goal of the example is to estimate the effect of 401(k) eligibility on net financial assets for different values of income both parametrically and non-parametrically.
 
-
-## Background
+## Parametric Estimation Background
 
 The target function is Conditional Average Treatment Effect, defined as
 
@@ -90,7 +89,7 @@ Our goal is to estimate $g(x)$.
 In step 1, we estimate the unknown functions $s_0(z),  \mu_0(1,z),  \mu_0(0,z)$ and plug them into $Y(\eta)$. In step 2, we approximate the function $g(x)$ by a linear combination of basis functions:
 
 $$ g(x) = p(x)' \beta_0$$
-where $p(x)$ is a vector of polynomials or splines and
+where $p(x)$ is a vector of group indicators, polynomials, or splines and
 
 $$ \beta_0 = (E[p(X) p(X)'])^{-1} E[ p(X) Y (\eta_0)] $$
 
@@ -107,7 +106,7 @@ $$
 $$
 
 
-## DML for Conditional ATE
+## DML for Doubly Robust Conditional ATE
 
 ```{r load package, message=FALSE}
 library(foreign)
@@ -147,7 +146,7 @@ X <- pension$inc
 
 ## raw covariates so that Y(1) and Y(0) are independent of D given Z
 Z <- pension[, c(
-  "age", "inc", "fsize", "educ", "male", "db", "marr", "twoearn", "pira", "hown", "hval", "hequity", "hmort",
+  "inc", "age", "fsize", "educ", "male", "db", "marr", "twoearn", "pira", "hown", "hval", "hequity", "hmort",
   "nohs", "hs", "smcol"
 )]
 cat(sprintf("\n sample size is %g \n", length(Y)))
@@ -208,6 +207,8 @@ first_stage_rf <- function(Y, D, Z, seed = 1) {
 
 ```
 
+### Parametric Estimation
+
 In Step 2, we approximate $Y(\eta_0)$ by a vector of basis functions. The simplest use case of Conditional Average Treatment Effect is GATE, or Group Average Treatment Effect. Partition the support of income as
 
 $$ - \infty = \ell_0 < \ell_1 < \ell_2 \dots \ell_K = \infty $$
@@ -240,7 +241,7 @@ s_hat <- fs_hat[["s_hat"]]
 min_cutoff <- 0.01
 s_hat <- sapply(s_hat, max, min_cutoff)
 
-## construct orthogonal signal
+## construct orthogonal or robust signal
 RobustSignal <- (Y - mu1_hat) * D / s_hat - (Y - mu0_hat) * (1 - D) / (1 - s_hat) + mu1_hat - mu0_hat
 ```
 
@@ -316,7 +317,7 @@ data.frame(
 
 ```
 
-## Fit CATE by Income Spline
+## Fit CATE by Income Polynomials
 
 ```{r spline and second stage, message=FALSE}
 
@@ -328,7 +329,7 @@ least_squares_series <- function(X, Y, max_degree=3) {
     fit <- lm(formula.pol)
     cv_pol[degree] <- sum((fit$res / (1 - hatvalues(fit)))^2)
   }
-  ## number of knots chosen by cross-validation
+  ## number of polynomials chosen by cross-validation
   cv_degree <- which.min(cv_pol)
 
   ## estimate coefficients
@@ -362,7 +363,8 @@ second_stage <- function(X, Y = RobustSignal, norder = 4, nderiv = 0,
 }
 ```
 
-```{r}
+
+```{r plot parametric, message=FALSE}
 ## fit second stage
 res_rf_least_squares_series <- second_stage(X = X, Y = RobustSignal)
 data.frame(income = rep(res_rf_least_squares_series$x_grid, 3),
@@ -384,4 +386,101 @@ data.frame(income = rep(res_rf_least_squares_series$x_grid, 3),
       theme(legend.title = element_blank()) +
       theme(legend.position = "none") +
       scale_linetype_manual(values = c("solid","dashed","dashed"))
+```
+
+### Non-Parametric Estimation
+
+Here we demonstrate the use of non-parametric estimation of HTE, specifically Doubly Robust Forest and Causal Forest (see similar figures on pp. 382).
+
+```{r DR forest, message=FALSE}
+## here we regress robust signal against Z that includes X
+dr.forest <- regression_forest(Z, RobustSignal)
+
+## create median-fixed grid for prediction
+medians <- as.list(apply(Z[, setdiff(names(Z), "inc")], 2, median))
+centers <- kmeans(Z$inc, centers = 10)$centers
+inc.grid <- sort(as.numeric(centers))
+## I use kmean clustering to minimize within-cluster variance
+## it represenst 10 typical income levels, spread so that dense regions of inc get more clusters, sparse regions fewer
+
+## data for prediction
+newdata <- data.frame(
+  inc = inc.grid,
+  matrix(rep(unlist(medians), each = length(inc.grid)),
+         nrow = length(inc.grid), byrow = FALSE)
+)
+names(newdata) <- names(Z)
+
+## predict from DR forest with variance estimates for CI
+pred <- predict(dr.forest, newdata = newdata, estimate.variance = TRUE)
+
+## build tidy data frame for plotting
+plot_df <- data.frame(
+  exp_inc  = exp(newdata$inc),
+  tau_hat  = pred$predictions,
+  ci_lower = pred$predictions - 1.96 * sqrt(pred$variance.estimates),
+  ci_upper = pred$predictions + 1.96 * sqrt(pred$variance.estimates)
+)
+
+# plot
+DR_forest <- ggplot(plot_df, aes(x = exp_inc, y = tau_hat)) +
+  geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper),
+              fill = "grey", alpha = 0.3) +
+  geom_line(color = "red4", linewidth = 1) +
+  labs(
+    x = "Income",
+    y = "Estimated CATE (conditional at medians of other features)",
+    title = "Conditional CATE by income (DR Forest)"
+  ) +
+  theme_bw(base_size = 10) +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+Below we fit the same CATE estimates using Causal Forest.
+
+```{r causal forest, message=FALSE}
+## causal forest
+cf <- causal_forest(Z, Y, D,
+                    num.trees = 2000, 
+                    honesty = TRUE)
+
+## build grid for prediction (same as before)
+medians <- as.list(apply(Z[, setdiff(names(Z), "inc")], 2, median))
+centers <- kmeans(Z$inc, centers = 10)$centers
+inc.grid <- sort(as.numeric(centers))
+newdata <- data.frame(
+  inc = inc.grid,
+  matrix(rep(unlist(medians), each = length(inc.grid)),
+         nrow = length(inc.grid), byrow = FALSE)
+)
+names(newdata) <- names(Z)
+
+## predict CATEs with variance estimates
+pred <- predict(cf, newdata = newdata, estimate.variance = TRUE)
+
+## build tidy data frame for plotting
+plot_df <- data.frame(
+  exp_inc  = exp(newdata$inc),
+  tau_hat  = pred$predictions,
+  ci_lower = pred$predictions - 1.96 * sqrt(pred$variance.estimates),
+  ci_upper = pred$predictions + 1.96 * sqrt(pred$variance.estimates)
+)
+
+## plot
+causal_forest <- ggplot(plot_df, aes(x = exp_inc, y = tau_hat)) +
+  geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper),
+              fill = "grey", alpha = 0.3) +
+  geom_line(color = "blue4", linewidth = 1) +
+  labs(
+    x = "Income",
+    y = "Estimated CATE (conditional at medians of other features)",
+    title = "Conditional CATE by income (Causal Forest)"
+  ) +
+  theme_bw(base_size = 10) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+library(ggpubr)
+ggarrange(DR_forest, causal_forest)
 ```

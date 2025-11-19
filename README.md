@@ -216,3 +216,25 @@ In the coding component, we implement *Double Machine Learning (DML) for Conditi
 ---
 </details>
 
+<details>
+  <summary><h2>Week 12 and 13 Heterogeneous Treatment Effects</h2></summary>
+
+In these two core weeks, we move beyond estimating a single Average Treatment Effect (ATE) to uncovering *Heterogeneous Treatment Effects (HTE)*—how causal effects vary across individuals and subgroups. We focus on the *Conditional Average Treatment Effect (CATE)* framework, where the treatment effect is modeled as a function of covariates under Conditional Independence Assumption (CIA).  
+
+We begin with a review of the *Interactive Regression Model (IRM)* and the doubly robust formulation of the treatment effect, highlighting *Neyman orthogonality* and *cross-fitting* as key tools for valid inference when using Machine Learning for nuisance estimation. We then estimate CATEs both *parametrically* and *nonparametrically*.  
+
+In the coding component, we estimate CATEs for the effect of *401(k) eligibility* on *net financial assets*, conditional on income. Parametric estimation uses *Group Average Treatment Effects (GATEs)* by income quintile and smooth polynomial approximations. Nonparametric methods employ *Doubly Robust (DR) Forests* and *Causal Forests*, which learn heterogeneity directly from data by partitioning feature space to maximize treatment effect variation. These forests produce individual-level treatment estimates with valid confidence intervals under honesty and cross-fitting.  
+
+### Roadmap
+
+- Introduce the *Conditional Average Treatment Effect (CATE)* and its identification under conditional exogeneity.  
+- Derive the doubly robust and orthogonal signal for estimating heterogeneous effects.  
+- Implement *parametric estimation* of CATEs (e.g., income-group GATEs and polynomial approximations).  
+- Introduce *nonparametric estimation* via *Doubly Robust Forests* and *Causal Forests*, emphasizing algorithmic honesty and cross-fitting.  
+- Apply these methods to estimate heterogeneous effects of *401(k) eligibility* on *net financial assets*, showing how treatment effects increase with income.  
+
+### Materials
+- [Slides: Week 12 and 13 Heterogeneous Treatment Effects](./Week%2012%20and%2013%20Heterogeneous%20Treatment%20Effects/Week%2012%20and%2013%20Slides.pdf)  
+- [R Code: DML for Conditional Average Treatment Effects](./Week%2012%20and%2013%20Heterogeneous%20Treatment%20Effects/DMLforCATE.pdf)
+---
+</details>
