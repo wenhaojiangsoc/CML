@@ -1,0 +1,144 @@
+---
+title: "Final Project for SOCIOL 690S: Replication of Brand et al. (2021)"
+subtitle: "\\textit{Due date}: December 15, 11:59PM"
+author: "Your name:"
+format:
+  pdf:
+    pdf-engine: pdflatex 
+    documentclass: article
+    classoption: ["12pt"]
+    geometry: "top=1.1in, bottom=1.1in, left=1.1in, right=1.1in"
+    include-in-header:
+      text: |
+        \DeclareMathOperator*{\argmin}{arg\,min}
+        % fonts, math
+        \usepackage[T1]{fontenc}
+        \usepackage{dsfont}
+        \usepackage{lmodern}
+        \usepackage{amsmath}
+        \usepackage{bm}
+        
+        % colors
+        \usepackage[dvipsnames]{xcolor}
+        
+        % Indent & line spacing
+        \usepackage{setspace}
+        \setstretch{1.2}
+        \setlength{\parindent}{20pt}
+        \AtBeginDocument{
+        \setlength{\abovedisplayshortskip}{-10pt}
+        \setlength{\belowdisplayshortskip}{3.5pt}
+        }
+        
+        % Figures
+        \usepackage{graphicx}
+        \usepackage{tikz}
+        \usetikzlibrary{arrows.meta, positioning, fit}
+
+        % Equal spacing between Title, Date, Author
+        \makeatletter
+        \renewcommand{\maketitle}{%
+          \begin{center}
+            {\LARGE \bfseries \@title \par}
+            \vspace{0.75em}%
+            {\large \itshape \@date \par}
+            \vspace{0.75em}%
+            {\large \@author \par}
+          \end{center}\par\vspace{1em}
+        }
+        \makeatother
+editor: source
+---
+
+# Instructions
+
+In this final project, you are expected to replicate some of the key findings in [Brand et al. (2021)](https://journals.sagepub.com/doi/full/10.1177/0081175021993503), an early and influential paper that introduces the estimation of Heterogeneous Treatment Effects (HTE) to readers in sociology. The authors investigate whether, and for which groups of the population, attending college may be economically rewarding in the form of reducing the proportion of time spent in low-wage work over a career.
+
+The code below loads the data and defines the treatment, outcome, and covariates used in this replication task. Note that the sample data are a subset of the original dataset; therefore, some discrepancies between your replication and the original results are normal and expected.
+
+```{r load package and read data, message=FALSE}
+library(foreign)
+library(grf)
+library(dplyr)
+library(ggplot2)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+
+## load data in R
+df <- read.dta(
+  "sample.dta") 
+
+## description of covariates to be conditioned on in HTE can be found in Table 1
+covariates <- c("male","black","hisp","i_daded",
+                  "i_momed","i_parinc","i_daduwhcol",
+                  "i_intact","i_sibsz","i_rural",
+                  "i_south","i_abil","i_hsprog",
+                  "i_eduexp","i_eduasp","i_freduasp",
+                  "i_rotter","i_delinq","i_schdisadv",
+                  "i_mar18","i_parent18","good")
+
+## remove the observations where the covariates are missing
+df <- df[,c(covariates,"lowwaprop","compcoll25",
+            "parinc3c","momed3c","abil3c","race")] %>% ## these four variables are used in Table 2 for stratified CATE
+  na.omit()
+
+## define treatment and outcome
+Y <- df$lowwaprop ## the proportion of time in low-wage work over a career
+D <- df$compcoll25 ## attending college
+X <- df[,covariates]
+```
+
+## Replication of Table 2
+
+The first task is to replicate Table 2 with potential improvements in execution and an extension. Specifically, replicate the estimates in column 2 `unadjusted`, column 3 `IPW`, and column 5 `Causal Forest`, with an additional estimation of the aggregated ATE using `Augmented IPW` and `Doubly Robust Forest`. Please organize your estimations in a table; reporting standard errors is not required.
+
+(1) In `IPW` and `AIPW`, you will need to estimate the nuisance propensity score function. In `Doubly Robust Forest`, you will additionally need to estimate the outcome regression. In both cases, estimate the nuisance functions using Random Forest and 5-fold cross-fitting. Specifically, follow the formal pipeline for fine-tuning the Random Forest model used in cross-fitting. That is, fine-tune your model using 5-fold Cross-Validation (CV) within the training sample, excluding the held-out fold used in cross-fitting. Predict each individual’s propensity score (trim values smaller than 0.01 up to 0.01) and potential outcomes under control and under treatment. The search grid for Random Forest parameters is `ntree = 300, 500, 1000, 2000`.
+
+Hint: This is a direct extension of the `first_stage_rf()` function in `DMLforCATE.qmd`, which uses 2-fold cross-fitting but lacks fine-tuning.
+
+(2) Report your estimated ATE under `unadjusted`, `IPW` based on the cross-fitted propensity score estimated from step 1, and `Augmented IPW` based on the cross-fitted propensity score and cross-fitted potential outcomes under control and treatment (i.e., the mean of the robust signal) estimated from step 1. All individuals are equally weighted.
+
+(3) Report your estimated ATE using `Doubly Robust Forest` via the standard function `regression_forest()` with default parameters and `predict()`.
+
+(4) Report the ATE using honest `Causal Forest`, based on the function `causal_forest()` with `4000` trees and at least `10` observations in each leaf as parameters. All individuals are equally weighted.
+
+Hint: For `Causal Forest`, you may derive the ATE using `average_treatment_effect()`. For `Doubly Robust Forest`, you may calculate the mean of the predicted ATEs across individuals.
+
+## Replication of Table 3
+
+(1) Table 3 reports the Conditional Average Treatment Effects (CATE) by pre-specified groups (parental income, mother's education, ability, and race). Your task is to replicate the results in the columns `IPW` and `Causal Forest`, and add an additional column estimating `Doubly Robust Forest` CATE for each group. You may inherit all relevant results from your previous task. Again, present your results in a table; reporting standard errors is not required. 
+
+(2) Another important result presented by the authors (Figure A1 in the Appendix) illustrates the relationship between the predicted propensity score and the CATE (see page 203 for details). Estimate the best linear prediction of the CATE on the propensity score using both the `Causal Forest` and the `Doubly Robust Forest`. Discuss what you can conclude based on the results from (1) and (2).
+
+## Replication of Figure 4 and Table 4
+
+Although a full replication of Figure 4 and Table 4 is not straightforward, you can approximate these results by visualizing or tabulating the CATE obtained from recursively partitioning the covariate space using a `Causal Tree` or `Doubly Robust Tree`. For example, after deriving individual-level ATEs from a `DR Forest` using:
+
+```{r, eval=FALSE}
+tau.hat <- predict(dr.forest)$predictions
+```
+
+You can fit a decision tree targeting the predicted CATE, ensuring that each node contains at least `N` observations:
+
+```{r, eval=FALSE}
+tree_tau <- rpart(tau.hat ~ ., data = data.frame(X, tau.hat),
+                  control = rpart.control(minbucket = N))
+
+rpart.plot(tree_tau, main = "CATE Heterogeneity Tree",
+           type = 1)
+```
+
+(1) Using these commands, show the CATE tree based on both the `Causal Tree` and the `Doubly Robust Tree`, ensuring that each leaf node contains at least 50 observations.  
+
+(2) Discuss whether the pattern you observe from the tree (i.e., which groups benefit the most or least from college attendance) is consistent with the results you reported in the previous section.
+
+## Replication of Figure 6
+
+Finally, replicate the covariate importance plot based on the `Causal Forest` that estimates the effect of college completion on the proportion of time spent in low-wage work, as shown in Figure 6 of the paper.
+
+(1) Use the function `grf::variable_importance(yourGRFmodel)` to produce a plot of covariate importance, displaying the variables in descending order of importance as in Figure 6.
+
+(2) Read the underlying code of `grf::variable_importance()` by calling `grf:::variable_importance` in your Console. Explain in plain language what this function measures, and interpret the most important covariate displayed in your plot.
+
+(3) More broadly, given that Athey et al. (2019) referred to the method as the “Causal Forest,” discuss whether we can interpret the estimated CATE as unbiased estimates of the causal effect of college education on work outcomes.

@@ -12,11 +12,7 @@ format:
         % fonts, math
         \usepackage[T1]{fontenc}
         \usepackage{dsfont}
-        \usepackage{newpxtext}
-        \let\arrowvert\relax
-        \let\Arrowvert\relax
-        \let\mathscr\relax
-        \usepackage{newpxmath}
+        \usepackage{lmodern}
         \usepackage{amsmath}
         \usepackage{bm}
         

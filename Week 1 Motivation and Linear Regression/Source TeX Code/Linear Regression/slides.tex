@@ -13,6 +13,7 @@
 \usepackage{xcolor}
 \usepackage{fancyhdr}
 \usepackage{booktabs}
+\usepackage[table]{xcolor}
 
 % subsection page template
 \setbeamertemplate{subsection page}
@@ -56,8 +57,8 @@
 
 %% font
 \usepackage{dsfont}
-\usepackage{newpxtext}
-\usepackage{newpxmath}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
 \usepackage{amsmath}
 
 % Math & bib
@@ -88,7 +89,7 @@
 
 %% affiliation
 \institute[Duke]{}
-\titlegraphic{\includegraphics[height=1.4cm]{../Misc/duke_logo.png}}
+\titlegraphic{\includegraphics[height=1.4cm]{Misc/duke_logo.png}}
 
 \date[Duke]
 {\large Department of Sociology, Fall 2025}
@@ -170,6 +171,14 @@
 \end{itemize}
 \end{frame}
 
+\subsection{Syllabus and Timeline}
+
+\begin{frame}{}
+\vspace{-1.4em}
+\setlength{\tabcolsep}{1pt}
+{\footnotesize\input{syllabus/schedule}}
+\end{frame}
+
 %% FWL Theorem %%
 \section{Linear Regression}
 
@@ -199,7 +208,7 @@
         \item Suppose $X_i$ is years of completed education, $Y_i$ is weekly earnings
         \begin{figure}
             \centering
-            \includegraphics[width=0.7\linewidth]{./Figures/CEF_education.png}
+            \includegraphics[width=0.7\linewidth]{Linear Regression/Figures/CEF_education.png}
             \caption{The CEF of average weekly earnings given schooling}
             \label{fig:CEF_education}
         \end{figure}
@@ -486,7 +495,7 @@ Equation holds using either $\check{Y}_i$ or $Y_i$, as the part being partialled
 
     \begin{figure}
         \centering
-        \includegraphics[width=0.75\linewidth]{./Figures/FWL_example.png}
+        \includegraphics[width=0.75\linewidth]{Linear Regression/Figures/FWL_example.png}
         \caption{The Nature of Conflict (Arbatli, Ashraf, and Galor 2015)}
         \label{fig:placeholder}
     \end{figure}
@@ -631,4 +640,5 @@ When \textit{Neyman Orthogonality} is satisfied (OLS satisfies it by design)
     \end{itemize}
 \end{frame}
 
+\bibliography{}
 \end{document}

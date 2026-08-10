@@ -1,0 +1,920 @@
+\documentclass[aspectratio=1610,12pt,xcolor=dvipsnames]{beamer}
+\mode<presentation>
+
+% Respect chosen fonts (serif) and metrics
+\usefonttheme{professionalfonts}
+\renewcommand{\familydefault}{\rmdefault}
+
+% Figures
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit}
+
+%% table
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{booktabs}
+\usepackage[table]{xcolor}
+\usepackage{tabularx,array}
+
+% subsection page template
+\setbeamertemplate{subsection page}
+{
+  \begin{centering}
+    \vfill
+    {\usebeamerfont{section title}\usebeamercolor[fg]{section title}\Large\insertsubsectionhead\par}
+    \vfill
+  \end{centering}
+}
+% section page template
+\setbeamertemplate{section page}
+{
+  \begin{centering}
+    \vfill
+    {\usebeamerfont{section title}\usebeamercolor[fg]{section title}\Large\insertsectionhead\par}
+    \vfill
+  \end{centering}
+}
+
+%% footnote
+\setbeamertemplate{footnote}{%
+  \parindent 0em\noindent%
+  \raggedright\insertfootnotemark\insertfootnotetext\par%
+}
+
+%% theme
+\usetheme{default}
+\useoutertheme{miniframes}
+\definecolor{nagivation}{rgb}{0,0,0.35} % (typo kept if intentional)
+\definecolor{main}{rgb}{0,0,0.5}
+\setbeamercolor{structure}{bg=white,fg=nagivation}
+\setbeamercolor{frametitle}{fg=nagivation}
+\setbeamercolor{section in head/foot}{fg=white,bg=nagivation}
+\setbeamertemplate{footline}[page number]
+\setbeamertemplate{items}[circle]
+\setbeamerfont{footnote}{size=\footnotesize}
+\setbeamerfont{caption}{size=\footnotesize}
+\setbeamertemplate{subsection in head/foot}{}%
+\setbeamertemplate{subsection in head/foot shaded}{}%
+
+%% font
+\usepackage{dsfont}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+
+\setbeamerfont{section title}{series=\bfseries}
+\setbeamerfont{subsection title}{series=\bfseries}
+\setbeamerfont{block title}{series=\bfseries}
+
+% Math & bib
+\usepackage{amsmath,amsfonts,amssymb,bm}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\indep}{\perp\!\!\!\, \perp}
+\usepackage{natbib}
+\bibliographystyle{asr}
+\setcitestyle{aysep={}}
+\usepackage[english]{babel}
+
+\makeatletter
+\DeclareRobustCommand\citep
+{\begingroup\scriptsize\color{gray}\NAT@swatrue\let\NAT@ctype\z@\NAT@partrue
+    \@ifstar{\NAT@fulltrue\NAT@citetp}{\NAT@fullfalse\NAT@citetp}}
+\makeatother
+
+% Roman numerals macro
+\newcommand{\rom}[1]{\uppercase\expandafter{\romannumeral #1\relax}}
+
+%% Title
+\title[CML]{SOC 690S: Machine Learning in Causal Inference\\[1.5pt]}
+\subtitle{\large Week 14: Feature Engineering for Causal Inference\footnote{\scriptsize I heavily draw upon the materials from \href{https://causalml-book.org/}{Chapter 10} of the textbook of Causal Machine Learning by Chernozhukov et al. (2026)} \\[-10pt]}
+
+%% author
+\author[Jiang]
+{\large Wenhao Jiang\vspace{-2em}}
+
+%% affiliation
+\institute[Duke]{}
+\titlegraphic{\includegraphics[height=1.4cm]{Misc/duke_logo.png}}
+
+\date[Duke]
+{\large Department of Sociology, Fall 2025}
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%Begin Main Content%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Title page %%
+\begin{frame}
+    \titlepage 
+\end{frame}
+
+\section{Introduction and Motivation}
+
+\begin{frame}{Introduction and Motivation}
+
+\begin{itemize}
+    \item Social scientists increasingly leverage unstructured, multimodal data to study human behavior, social interactions, and cultural and institutional processes \citep{lazer2009computational}
+    
+    \item These data are often represented as vector \textit{embeddings} for machines to understand and analyze \pause
+    
+    \item Sociologists have primarily used embeddings in two ways:
+    \begin{itemize}
+        \item As \textit{objects of study} that capture cultural meaning, symbolic associations, and social representations \citep{kozlowski2019geometry}
+        \item As predictive features that improve downstream tasks, often by fine-tuning pre-trained models \citep{bonikowski2022politics}
+    \end{itemize} \pause
+    \item Despite their substantive richness, embeddings are rarely incorporated as \textit{features} into standard causal inference, even though they may encode important confounding information that should be adjusted for in regression analyses
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Introduction and Motivation}
+
+\begin{itemize}
+    \item Causal inference researchers are interested in estimating the treatment effect of $D$ on the outcome $Y$
+    \[ Y = \beta_1 D + \beta_2' W + \epsilon \]
+    \item In observational settings, we rely on the \textit{strong ignorability} assumption, which requires that all confounders are observed and properly modeled by $\beta_2' W$ \pause
+    \item This is a strong assumption because there are numerous potential confounders, some of which are difficult to measure using, for example, survey data
+
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Introduction and Motivation}
+
+\begin{itemize}
+    \item Consider the \textit{neighborhood effects} literature, where neighborhood context is argued to have a causal effect on individual outcomes
+    \item For example, in studying the effect of gunshot presence in a neighborhood on children's academic performance, one may need to control for overall neighborhood ``quality''
+    \item Increasingly, researchers use data such as images and text to measure neighborhood ``quality,'' which is often not captured in survey data
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Introduction and Motivation}
+
+\begin{itemize}
+    \item Consider estimating the \textit{price elasticity of demand}: the causal effect of price on consumer demand
+    \item Comparing products that differ substantially in quality, design, or target market can confound this relationship
+    \item Credible estimation requires controlling for product quality and other characteristics, but these attributes are often difficult to measure using conventional structured data \citep{bajari2025hedonic} \pause
+    \begin{itemize}
+        \item However, they may be encoded in product images or text as embeddings
+    \end{itemize} 
+\end{itemize}
+    
+\end{frame}
+
+\begin{frame}{Overview of the Talk}
+\begin{itemize}
+    \item Introduce several approaches for transforming complex data—particularly text, which encodes rich information—into low-dimensional representations   
+    \item Review Double Machine Learning (DML), which enables flexible adjustment for high-dimensional feature representations in regression\footnote{\scriptsize ``Low-dimensional'' is relative to the original text data, which may contain millions of unique words and their relationships; ``high-dimensional'' is relative to the sample size ($p/n \not\rightarrow 0$)}
+    \begin{itemize}
+        \item Brief review of OLS, the Frisch--Waugh--Lovell (FWL) theorem, and their asymptotic properties
+        \item Introduction to \textit{Neyman Orthogonality}
+    \end{itemize}
+    \item Illustrate the methods  using the example of estimating the price elasticity of demand from Amazon's data
+\end{itemize}
+\end{frame}
+
+\section{Double Machine Learning (DML)}
+
+\begin{frame}
+  \sectionpage
+\end{frame}
+
+\begin{frame}{OLS and the Frisch--Waugh--Lovell (FWL) Theorem}
+
+\begin{itemize}
+    \item Consider the linear regression model under low-dimensional regime
+    \begin{align*}
+        Y = \beta_1 D + \beta_2'W + \epsilon
+    \end{align*}
+
+    \item FWL Theorem states that the coefficient $\beta_1$ can be obtained by regressing the residualized outcome on the residualized treatment\footnotetext{\scriptsize For a proof, see p.~32 week 1 slides: \url{https://github.com/wenhaojiangsoc/CML/tree/main}}
+    \begin{align*}
+        \beta_1
+        =
+        \arg\min_{b}
+        E\!\left[(\tilde Y-b\tilde D)^2\right]
+    \end{align*} \\[-2em]
+    \begin{align*}
+        \tilde D &= D-\gamma_D'W;
+        &\hspace{-3em}
+        \gamma_D
+        &=\arg\min_{\gamma}
+        E\!\left[(D-\gamma'W)^2\right] \\
+        \tilde Y &= Y-\gamma_Y'W;
+        &\hspace{-3em}
+        \gamma_Y
+        &=\arg\min_{\gamma}
+        E\!\left[(Y-\gamma'W)^2\right]
+    \end{align*}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{OLS and the Frisch--Waugh--Lovell (FWL) Theorem}
+
+\begin{itemize}
+    \item Under regularity conditions and low-dimensional data $p/n \rightarrow 0$
+    \begin{align*}
+    \sqrt{n}\left(\hat{\beta}_1-\beta_1\right)
+    \xrightarrow{d}
+    \mathcal{N}\!\left(
+    0,\,
+    E\!\left[\tilde D\tilde D'\right]^{-1}
+    E\!\left[\epsilon^2\tilde D\tilde D'\right]
+    E\!\left[\tilde D\tilde D'\right]^{-1}
+    \right)
+\end{align*}
+    \item $\hat \beta_1$ is $\sqrt n$-consistent
+    \item The consistent ``sandwich'' estimator (Eicker-Huber-White) of a \textit{sample} is then given by
+\begin{align*}
+    \hat{V}(\hat{\beta}_1) = \left(\tilde D \tilde D'\right)^{-1}\left( \sum_i^{n} \tilde D \tilde D'\hat{\epsilon}^{2} \right) \left(\tilde D \tilde D'\right)^{-1}
+\end{align*}
+by plugging in sample $\hat \epsilon^2$ to estimate $\epsilon^2$
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Double Machine Learning (DML)}
+
+\begin{itemize}
+    \item Under high-dimensional regime $p/n \not\rightarrow 0$, the nuisance regressions can no longer be estimated precisely enough for conventional OLS inference; $\sqrt n$ asymptotic normality generally fails
+
+    \item Double Machine Learning (DML) yields $\sqrt n$-consistent estimates and valid standard errors under \textit{Neyman Orthogonality} and cross-fitting
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Double Machine Learning (DML)}
+
+\begin{itemize}
+    \item Consider a partially linear model under a high-dimensional regime
+    \begin{align*}
+        Y &= \beta_1 D + \eta(W) + \epsilon \\
+        \beta_1 &=
+        \arg\min_{b}
+        E\!\left[(\tilde Y-b\tilde D)^2\right] \\
+        \tilde Y &= Y - E\!\left[ Y \mid W \right] \\
+        \tilde D &= D - E\!\left[ D \mid W \right]
+    \end{align*}
+
+    \item The nuisance functions $g(W)=E\!\left[Y\mid W\right]$ and $m(W)=E\!\left[D\mid W\right]$ can be estimated flexibly using nonlinear models.
+
+    \item Machine learning provides a natural class of estimators for these nuisance functions when $W$ is high-dimensional.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Cross-Fitting in Double Machine Learning (DML)}
+
+\begin{itemize}
+    \item Nuisance functions and residualization are operationalized through \textit{cross-fitting}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.67\linewidth]{Feature Engineering/Figures/cross-fitting.pdf}
+    \end{figure}
+    \item The nuisance functions $g(W) = E\!\left[Y \mid W\right]$ and $m(W) = E\!\left[D \mid W\right]$ are estimated in the \textcolor{blue!45}{blue fold}, and $\tilde Y$ and $\tilde D$ are estimated in the \textcolor{red!45}{red fold}
+\end{itemize}
+    
+\end{frame}
+
+\begin{frame}{Neyman Orthogonality in Double Machine Learning (DML)}
+
+\begin{itemize}
+
+\item The key property underlying Double Machine Learning is \textit{Neyman Orthogonality} through \textit{cross-fitting}
+
+\item Consider the moment function
+\begin{align*}
+\psi \left(Y,D,W;\beta,g,m \right) &=
+(\tilde Y-\beta\tilde D)\tilde D \\
+\tilde Y = Y-g(W), &\:\:
+\tilde D = D-m(W) \\[-2.6em]
+\end{align*} \pause
+\item The moment is Neyman orthogonal if its (Gateaux) derivative with respect to the nuisance functions vanishes at the truth
+\[
+\left.
+\frac{\partial E\!\left[\psi(Y,D,W;\beta,g,m)\right]}{\partial(g,m)}
+\right|_{(g,m)=(g_0,m_0)}
+=0
+\]
+
+\item Intuitively, the moment function is locally \emph{flat} in the nuisance direction
+
+\item Consequently, small errors in estimating $g$ and $m$ contribute only \emph{second-order} bias, allowing valid $\sqrt n$-inference for $\beta_1$
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Double Machine Learning: Neyman Orthogonality}
+
+\begin{figure}
+    \centering
+    \hspace*{-1.6cm} % shift left
+    \vspace*{2em} % shift up
+    \includegraphics[width=1.15\linewidth]{Causal Inference Potential Outcome/Figures/orthogonal vs. non.png}
+\end{figure}
+\end{frame}
+
+\begin{frame}{Double Machine Learning with Embeddings}
+
+\begin{itemize}
+    \item We estimate the effect of product price on consumer demand while controlling for high-dimensional covariates $W$, such as text or image embeddings that encode rich information about product characteristics
+    
+    \item Rather than assuming a fully linear model, we consider the partially linear model
+    \begin{align*}
+        Y = \beta_1 D + \eta(W) + \epsilon
+    \end{align*}
+    
+    \item The target parameter $\beta_1$ is estimated by
+    \[
+        \hat \beta_1
+        =
+        \arg\min_{b}
+        E\!\left[(\tilde Y-b\tilde D)^2\right]
+    \]
+    where $\tilde Y$ and $\tilde D$ are residualized using flexible machine learning methods with cross-fitting
+\end{itemize}
+\end{frame}
+
+\section{Feature Extraction}
+
+\begin{frame}
+  \sectionpage
+\end{frame}
+
+\begin{frame}{Feature Extraction: Principal Components}
+
+\begin{itemize}
+    \item We are interested in transforming complex objects such as text into a collection of relatively low-dimensional numerical features
+    \item Principal components are an early classic example of embeddings
+    \item One way to frame principal components is that principal components find orthonormal linear combinations that are ``best'' at reproducing the underlying data \pause
+    \item A small number of principal components should capture most of the variability in the original variables and provide a useful low-dimensional summary of the original data
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Feature Extraction: Principal Components}
+
+\begin{itemize}
+    \item Let $(W_1, ..., W_n)$ be a sample of $n$ observations of a high-dimensional centered random vector $W$ in $\mathds{R}^d$, and let $\Sigma_n = \mathbb{E}\left[WW'\right] \in \mathds{R}^{d \times d}$ denote the empirical covariance matrix \pause
+    \item The eigenvector $c_k$ in $\mathds{R}^d$ and eigenvalue $\lambda_k$ is found by 
+    \begin{align*}
+        \Sigma_n c_k = \lambda_k c_k
+    \end{align*}
+    \item We find the $K$ ($K \ll d$) largest eigenvalues in an descending order and corresponding eigenvectors $C_K = [c_1,...,c_K]$
+    \item We find $W_i$'s projection on each eigenvector (principal direction)
+    \begin{align*}
+        X_{ki} = c_k' W_i, \quad k = 1, ..., K
+    \end{align*}
+    \item Principal components $X_{i}^{K} \in \mathds{R}^{K}$
+    \begin{align*}
+        X_{i}^{K} = (X_{1i},...,X_{Ki})'
+    \end{align*}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Feature Extraction: Principal Components}
+
+\begin{itemize}
+    \item Principal components $X_{i}^{K} \in \mathbb{R}^{K}$
+    \begin{align*}
+        X_{i}^{K} = (X_{1i},...,X_{Ki})'
+    \end{align*}
+    \item $X_i^K$ represents the compressed feature vector of the original high-dimensional vector $W$ 
+    \begin{figure}
+    \centering
+    \includegraphics[width=0.95\linewidth]{Feature Engineering/Figures/PCA_illustration.pdf}
+    \end{figure}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Feature Extraction: Principal Components}
+
+\begin{itemize}
+    \item Principal components $X_{i}^{K} \in \mathbb{R}^{K}$
+    \begin{align*}
+        X_{i}^{K} = (X_{1i},...,X_{Ki})'
+    \end{align*}
+    \item $X_i^K$ represents the compressed feature vector of the original high-dimensional vector $W$ 
+    \item One common use of Principal Components is to compress image
+    \item We approximate the original vector $W_i$ by projecting $X_i^K$ back to the $d$-dimensional space
+    \[
+    \hat{W}_i = C_K X_i^K
+    \]
+    \item The choice of $K$ determines how much of the original information (variance) in $W_i$ is retained
+\end{itemize}
+
+
+\end{frame}
+
+\begin{frame}{Principal Components as Image Compression}
+
+\begin{figure}
+\centering
+
+\begin{minipage}{0.34\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{Feature Engineering/Figures/pca_fig1_matrix.png}
+\end{minipage}
+\hfill
+\begin{minipage}{0.32\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{Feature Engineering/Figures/pca_fig2_10pc.png}
+\end{minipage}
+\hfill
+\begin{minipage}{0.32\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{Feature Engineering/Figures/pca_fig3_50pc.png}
+\end{minipage}
+\end{figure}
+\end{frame}
+
+\begin{frame}{Principal Components in Other Applications}
+
+\begin{itemize}
+    \item Principal Component Analysis (PCA), or equivalently Singular Value Decomposition (SVD), underlies many important applications
+    \item Latent Semantic Analysis (LSA) creates low-dimensional embeddings for words and documents from a word--document matrix
+    \item Recommender systems create low-dimensional embeddings for users and items from a user--item interaction matrix
+\end{itemize}
+    
+\end{frame}
+
+\begin{frame}{Principal Components Projection as Autoencoder}
+
+\begin{itemize}
+    \item The approximation to $W_i$ from $W$ can be seen as a predictive exercise
+    \item It underlies a shallow one-layer \textit{linear} neural network
+    \begin{align*}
+    \underset{d \times 1}{W_i}
+    \;\mapsto\;
+    C_K' W_i := \underset{K \times 1}{E_i}
+    \;\mapsto\;
+    A' E_i := \underset{d \times 1}{\hat{W}_i}
+    \end{align*}
+    \item The first step is said to be ``encoding'' the information in the input, and the second step is said to be ``decoding'' in the sense of returning the encoded information to the original space
+    \item Principal components projections are embeddings generated by a linear ``encoder--decoder'' network (an \textit{autoencoder})
+    \item For principal components projection, $A = C_K'$
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Principal Components as Autoencoder}
+
+\begin{minipage}{0.5\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{Feature Engineering/Figures/autoencoder1.pdf}
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\textwidth}
+    \begin{itemize}
+        \item The weights connecting the input to each hidden neuron correspond to a principal direction (eigenvector)
+        \item The encoding layer outputs are the principal component
+        \item The decoder reconstructs the input using these components
+    \end{itemize}
+\end{minipage}
+\end{frame}
+
+\begin{frame}{Principal Components as Autoencoder}
+
+\begin{minipage}{0.5\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{Feature Engineering/Figures/autoencoder1_colored.pdf}
+\end{minipage} \pause
+\hfill
+\begin{minipage}{0.45\textwidth}
+    \begin{itemize}
+        \item The weights connecting each input neuron to hidden neurons correspond to each feature's weight or coefficient on each latent dimension
+    \end{itemize}
+\end{minipage}
+\end{frame}
+
+\begin{frame}{From Principal Components To Autoencoder}
+    
+\begin{minipage}{0.7\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{Feature Engineering/Figures/autoencoder2.pdf}
+\end{minipage}
+\hfill
+\begin{minipage}{0.28\textwidth}
+    \begin{itemize}
+        \item The approach can be generalized to nonlinear encoders and decoders with multiple layers with \textit{nonlinear} activation functions, forming deep autoencoders
+    \end{itemize}
+\end{minipage}
+    \[
+    W_i \;\overset{g_1}{\mapsto}\; E_i^{1} \;\cdots\; \overset{g_k}{\mapsto}\; E_i^{k}
+    \;\overset{g_{k+1}}{\mapsto}\; D_i^{k+1} \;\cdots\; \overset{g_m}{\mapsto}\; D_i^{m}
+    \;:=\; \hat{W}_i
+    \]   
+\end{frame}
+
+\begin{frame}{From Principal Components To Autoencoder}
+    
+\begin{minipage}{0.7\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{Feature Engineering/Figures/autoencoder2.pdf}
+\end{minipage}
+\hfill
+\begin{minipage}{0.28\textwidth}
+    \begin{itemize}
+        \item Deep autoencoders preserve more information in the original data
+        \item The trained encoder (the weights) is used to generate embeddings for downstream tasks
+    \end{itemize}
+\end{minipage}
+    \[
+    W_i \;\overset{g_1}{\mapsto}\; E_i^{1} \;\cdots\; \overset{g_k}{\mapsto}\; E_i^{k}
+    \;\overset{g_{k+1}}{\mapsto}\; D_i^{k+1} \;\cdots\; \overset{g_m}{\mapsto}\; D_i^{m}
+    \;:=\; \hat{W}_i
+    \]   
+\end{frame}
+
+\begin{frame}{From Autoencoders to General Embeddings}
+
+\begin{itemize}
+    \item The encoder--decoder paradigm underlies many modern representation learning methods, including deep autoencoders and encoder--decoder Transformers such as T5 and BART
+    
+    \item In a classical autoencoder, the objective is to minimize the expected reconstruction loss
+    \[
+        \mathbb{E}\!\left[\mathrm{loss}\!\left(W,\; d(e(W))\right)\right]
+    \]
+    where $e(\cdot)$ and $d(\cdot)$ denote the encoder and decoder
+
+    \item More generally, the prediction target need not be the original input
+    \[
+        \mathbb{E}\!\left[\mathrm{loss}\!\left(A,\; f(e(W))\right)\right]
+    \]
+    where $A$ is an arbitrary learning target
+\end{itemize}
+\end{frame}
+
+\begin{frame}{From Autoencoders to General Embeddings}
+
+\begin{itemize}
+    \item More generally, the prediction target need not be the original input
+        \[
+            \mathbb{E}\!\left[\mathrm{loss}\!\left(A,\; f(e(W))\right)\right]
+        \]
+        where $A$ is an arbitrary learning target
+    \item For example, BERT predicts masked words in a sentence, while T5 and BART reconstruct corrupted text from its encoded representation
+
+    \item The resulting embeddings often capture more useful semantic information than simple reconstruction
+
+    \item In our price elasticity example from Amazon products we will see later, we may prefer embeddings that encode product type and functionality rather than faithfully reconstruct the product description
+\end{itemize}
+    
+\end{frame}
+
+\section{Word2Vec}
+
+\begin{frame}
+  \sectionpage
+\end{frame}
+
+\begin{frame}{Word2Vec Embeddings}
+
+\begin{itemize}
+    \item Different learning objectives $A$ produce different types of embeddings
+    \item Word2Vec learns embeddings by predicting a word from its surrounding context (or the other way around)
+    \item This idea is motivated by the \textit{distributional hypothesis}: words are understood by their semantic context
+\end{itemize}
+
+\vspace{0.0em}
+
+\begin{minipage}{0.55\textwidth}
+\begin{itemize}
+    \item A bottle of \textcolor{blue}{tesgüino} is on the table
+    \item Everyone likes \textcolor{blue}{tesgüino}
+    \item \textcolor{blue}{Tesgüino} makes you drunk
+    \item We make \textcolor{blue}{tesgüino} out of corn
+\end{itemize}
+\end{minipage}
+\hspace{2em}
+\begin{minipage}{0.23\textwidth}
+\centering
+\pause
+\includegraphics[width=\linewidth]{Feature Engineering/Figures/tesguino.jpg}
+\end{minipage}
+\end{frame}
+
+\begin{frame}{Word2Vec Embeddings}
+
+\begin{itemize}
+    \item Two training objectives are commonly used in Word2Vec
+
+    \begin{itemize}
+        \item \textit{Continuous Bag-of-Words (CBOW):} predict the center word from its surrounding context
+        \item \textit{Skip-gram:} predict the surrounding context words from the center word
+    \end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Word2Vec: Skip-gram with Negative Sampling}
+
+\begin{minipage}{0.62\textwidth}
+\centering
+\includegraphics[width=\linewidth]{Feature Engineering/Figures/skipgram.pdf}
+\end{minipage}%%
+\begin{minipage}{0.37\textwidth}
+\begin{itemize}
+    \item Analogous to Principal Components Projection, each embedding ``weight'' (from input to embedding layer) learns the coefficient of the word to each latent semantic coordinate from the word co-occurrence structure
+\end{itemize}
+\end{minipage}
+\end{frame}
+
+\begin{frame}{Word2Vec Embeddings}
+
+\begin{minipage}{0.4\textwidth}
+\centering
+\includegraphics[width=\linewidth]{Feature Engineering/Figures/word_analogy.jpg}
+\end{minipage}%%
+\begin{minipage}{0.6\textwidth}
+\begin{itemize}
+    \item Word2Vec learns a low-dimensional vector representation for each word
+    \item Words appearing in similar contexts tend to have similar embeddings
+    \item The learned embeddings capture semantic relationships, such as word analogies \pause
+    \item However, the embeddings are context-independent: ``bank'' in ``river bank'' and ``financial bank'' receive the same representation
+    \item Word order and syntax are not explicitly modeled; sentence embeddings formed by averaging word embeddings are often imprecise
+\end{itemize}
+\end{minipage}
+\end{frame}
+
+\section{ELMo}
+
+\begin{frame}
+  \sectionpage
+\end{frame}
+
+\begin{frame}{Sequence Models}
+
+\begin{itemize}
+    \item A major advance beyond Word2Vec was to represent text as a \textit{sequence}, allowing embeddings to depend on word order and surrounding context
+    
+    \item For example, ``CASER belongs to NYU Shanghai'' conveys a different meaning than ``NYU Shanghai belongs to CASER'' \pause
+    
+    \item One influential approach is \textit{Embeddings from Language Models} (ELMo), which learns context-dependent word embeddings
+    
+    \item More generally, language models are inspired by the Shannon game: predict a missing or future word given the surrounding words in a sentence
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Sequence Model: ELMo}
+
+\begin{itemize}
+    \item Let $T_k$ denote the $k$-th token in a sentence of length $n$, and let $t$ denote a candidate word in the vocabulary
+    \item The forward language model predicts the next word using the preceding words
+    \[
+        p_k^{f}(t)
+        =
+        P\!\left(
+        T_{k+1}=t
+        \mid
+        T_1,\ldots,T_k;\theta
+        \right)
+    \]
+    \item The backward language model predicts the previous word using the following words:
+    \[
+        p_k^{b}(t)
+        =
+        P\!\left(
+        T_{k-1}=t
+        \mid
+        T_k,\ldots,T_n;\theta
+        \right)
+    \]
+    \item Here $\theta$ denotes all model parameters
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Sequence Model: ELMo}
+
+\begin{itemize}
+    \item Many social and economic processes are inherently sequential; for example, life-course trajectories in sociology and financial time series depend on past histories
+
+    \item Likewise, language exhibits sequential dependence: the probability of the next word depends on the preceding words
+
+    \item Recurrent Neural Networks (RNNs) model such sequential dependencies by maintaining a hidden state that evolves over the sequence
+
+    \item To mitigate vanishing and exploding gradients over long sequences, ELMo employs Long Short-Term Memory (LSTM) networks, whose gated architecture enables information to persist across many time steps
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Sequence Model: ELMo}
+
+\begin{minipage}{0.65\textwidth}
+\centering
+\includegraphics[width=\linewidth]{Feature Engineering/Figures/ELMo.pdf}
+\end{minipage}%%
+\begin{minipage}{0.34\textwidth}
+\begin{itemize}
+    \item Input $x_i$ consists of context-free word embeddings
+    \item Two LSTM networks are used, forward and backward
+    \item After pre-training, each word is associated with $2L$ contextual hidden states, where $L$ is the number of stacked LSTM layers in each direction
+\end{itemize}
+\end{minipage}
+\end{frame}
+
+\begin{frame}{Sequence Model: ELMo: ELMo and Downstream Task}
+
+\begin{minipage}{0.65\textwidth}
+\[t_k \mapsto w_k := \sum_{i=1}^{L} (\gamma_i w^f_{ki} + \bar{\gamma}_i w^b_{ki})\]
+\centering
+\includegraphics[width=\linewidth]{Feature Engineering/Figures/ELMo.pdf}
+\end{minipage}%%
+\begin{minipage}{0.34\textwidth}
+\begin{itemize}
+    \item $2L$ hidden states are combined to produce the final context-dependent ELMo embedding
+    \item The weights $\gamma$ and $\bar \gamma$ are learned during the downstream task (e.g., classification) to combine hidden states into context-dependent word representations
+\end{itemize}
+\end{minipage}
+\end{frame}
+
+\section{BERT}
+
+\begin{frame}
+  \sectionpage
+\end{frame}
+
+\begin{frame}{Transformer Architecture}
+
+\begin{itemize}
+    \item A recent advance in language modeling is the transformer architecture
+    
+    \item Rather than processing text sequentially, transformers use \textit{self-attention} to model the relationships among all words in a sentence simultaneously
+    
+    \item Compared with LSTMs, self-attention more effectively captures long-range dependencies by allowing each word to attend directly to the most relevant words, regardless of their distance in the sequence \pause
+    \item For example,\\[0.5em]
+    \begin{quote} 
+        \small{The Summer Institute in Computational Social Science (SICSS) at NYU Shanghai was hosted by CASER. \textbf{It} attracts smart audience from around the world.}
+    \end{quote} 
+    
+    \item Self-attention helps determine that ``\textit{it}'' refers to ``SICSS'', even though the relevant words are far apart
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Transformer Architecture}
+
+\begin{itemize}
+    \item A prominent transformer-based language model is \textit{Bidirectional Encoder Representations from Transformers} (BERT)
+
+    \item The original BERT model is pre-trained using two self-supervised objectives
+
+    \begin{itemize}
+        \item \textit{Masked Language Modeling (MLM):} Randomly mask a subset of words in a sentence and predict the masked words from their surrounding context
+
+        \item \textit{Next Sentence Prediction (NSP):} Given a pair of sentences, predict whether the second sentence immediately follows the first in the original text
+    \end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Transformer Architecture: BERT\footnote{\scriptsize Check out this site to calculate attention by hand \url{https://www.byhand.ai/p/11-can-you-calculate-self-attention}}}
+
+\begin{itemize}
+
+\item For a sentence of $n$ tokens, each token is represented by the sum of its token embedding (e.g., Word2Vec) and positional embedding. Collecting all token representations gives
+\[ X \in \mathds{R}^{n \times d}
+\]
+\item Query, Key, and Value matrices are computed by
+\begin{align*}
+    Q &= XW^Q \in \mathds{R}^{n \times d_k} \\
+    K &= XW^K \in \mathds{R}^{n \times d_k} \\
+    V &= XW^V \in \mathds{R}^{n \times d_v} \\
+    W^Q,\;W^K &\in \mathds{R}^{d \times d_k} \\
+    W^V &\in \mathds{R}^{d \times d_v}
+\end{align*}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Transformer Architecture: BERT}
+
+\begin{itemize}
+    \item Self-attention is computed as
+    \[
+    \operatorname{Attention}(Q,K,V)
+    =
+    \operatorname{softmax}
+    \!\left(
+    \frac{QK'}{\sqrt{d_k}}
+    \right)V
+    \]
+    \item Since $QK' \in \mathds{R}^{n\times n}$, each token computes an attention score for every token in the sequence, including itself
+
+    \item The resulting $n\times n$ attention matrix determines how information is aggregated across all tokens to produce contextual embeddings
+    \begin{itemize}
+        \item Each entry asks how much should token $i$ attend to token $j$
+    \end{itemize}
+    \item The rows of $\operatorname{Attention}(Q,K,V) \in \mathds{R}^{n \times d_v}$ are contextual representations of the tokens, which are further refined by the remainder of the Transformer block
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Transformer Architecture: BERT}
+
+\begin{itemize}
+    \item During pre-training, the projection matrices $W^Q$, $W^K$, and $W^V$ (together with all other model parameters) are updated by gradient descent, and $W^Q$, $W^K$, and $W^V$ are global model parameters
+
+    \item For example, consider the masked sentence
+    \[
+    \texttt{[CLS] The SICSS at NYU Shanghai was hosted by [MASK] . [SEP]}
+    \]
+
+    \item The model computes a contextual embedding for every token, uses the contextual embedding of \texttt{[MASK]} to predict the missing word, and compares the prediction with the true word (e.g., \texttt{CASER})
+
+    \item The prediction error is backpropagated to update $W^Q$, $W^K$, $W^V$, the feed-forward layers, and the token embeddings
+    
+    \item After training, the encoder (e.g., projection matrices, token embedding, residual connections) is retained to generate contextual embeddings
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Transformer Architecture: BERT}
+
+\begin{minipage}{0.6\textwidth}
+\centering
+\includegraphics[width=\linewidth]{Feature Engineering/Figures/BERT.pdf}
+\end{minipage}%%
+\begin{minipage}{0.4\textwidth}
+\begin{itemize}
+
+    \item The last Transformer layer produces the final hidden states $h_i^{(L)}$, which serve as the contextual embedding for each token
+
+    \item A sentence embedding can then be obtained by aggregating the token embeddings (e.g., averaging or pooling) or, in BERT, by using the contextual embedding of the special \texttt{[CLS]} token
+
+\end{itemize}
+\end{minipage}
+\end{frame}
+
+\begin{frame}{Fine-Tuning BERT for Downstream Tasks}
+\begin{itemize}     
+    \item There are two common approaches to adapting a pre-trained BERT model for downstream tasks    
+    \item \textit{Linear probing}: Freeze the pre-trained BERT encoder and train only a linear prediction head on top of the final hidden states         
+    \item \textit{Fine-tuning}: Update both the BERT encoder and the task-specific prediction head jointly using the downstream training data
+    \end{itemize} 
+\end{frame}
+
+\begin{frame}{Fine-Tuning BERT for Nuisance Function Estimation}
+
+\begin{itemize}
+
+\item Consider the partially linear model under high-dimensional regime
+\begin{align*}
+    Y &= \beta_1D+\eta(W)+\epsilon \\
+    \beta_1
+    &=
+    \arg\min_b
+    E\!\left[(\tilde Y-b\tilde D)^2\right] \\
+    \tilde Y &= Y-E\!\left[Y\mid W\right] \\
+    \tilde D &= D-E\!\left[D\mid W\right]
+\end{align*}
+
+    \item Here, $Y$ is product demand, $D$ is price, and $W$ is the BERT representation of the product description, obtained from the contextual embedding of the \texttt{[CLS]} token 
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Fine-Tuning BERT for Nuisance Function Estimation}
+
+\begin{itemize}
+\item To better approximate the nuisance functions
+\[
+g(W)=E\!\left[Y\mid W\right],
+\qquad
+m(W)=E\!\left[D\mid W\right]
+\]
+we adapt the pre-trained BERT model either by \textit{linear probing} or by \textit{fine-tuning}, which jointly updates both the BERT encoder and the prediction heads
+
+\item We fine-tune BERT to learn product representations that better predict both price and demand, thereby more effectively adjusting for confounding information contained in product descriptions
+
+\item Finally, we estimate price elasticity by applying Double Machine Learning to the residualized outcome $\tilde Y$ and treatment $\tilde D$ using cross-fitting
+
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Thank You}
+
+\begin{itemize}
+    \item Thank you! Please feel free to reach out with questions or to chat
+    \textcolor{blue}{ \texttt{wenhao.jiang@duke.edu}}  \pause
+    
+    \begin{minipage}{0.7\textwidth}
+        I am also looking for volunteers to help pre-test a research project that Siwei Cheng (NYU) and I are conducting on social interactions at conferences \\
+        We do not collect your name, speech content, or mobility trajectory, only which badges you are close to
+    \end{minipage} \hfill
+    \begin{minipage}{0.22\textwidth}
+        \begin{figure}
+        \centering
+        \includegraphics[width=1\linewidth]{Feature Engineering/Figures/openrc28_qr.png}
+    \end{figure}
+    \end{minipage}
+    
+    \item If you are interested, please:
+    \begin{itemize}
+        \item Open the web app, add it to your home screen, collect a badge, input your badge number in your app, and wear it throughout the afternoon and Happy Hour
+        \item At the end, return the badge to me or Cindy and confirm the return in the app
+    \end{itemize}
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{References}
+    \footnotesize
+    \bibliography{reference}
+\end{frame}
+\end{document}

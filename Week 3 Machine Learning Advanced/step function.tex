@@ -5,8 +5,8 @@
 
 %% fonts
 \usepackage{dsfont}
-\usepackage{newpxtext}
-\usepackage{newpxmath}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
 \usepackage{amsmath}
 \usepackage{caption}
 
@@ -85,17 +85,17 @@
 
 \node (root) {college < 0.5}
   child {node {exper < 14}
-    child {node {female ≥ 0.5}
+    child {node {female $\geq$ 0.5}
       child {node [leaf] {11}}
       child {node [leaf] {13}}
     }
-    child {node {hsg ≥ 0.5}
+    child {node {hsg $\geq$ 0.5}
       child {node [leaf] {13}}
       child {node [leaf] {15}}
     }
   }
   child {node {exper < 9.5}
-    child {node {female ≥ 0.5}
+    child {node {female $\geq$ 0.5}
       child {node [leaf] {16}}
       child {node [leaf] {18}}
     }

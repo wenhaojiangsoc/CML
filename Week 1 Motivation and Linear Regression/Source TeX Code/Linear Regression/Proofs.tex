@@ -7,11 +7,12 @@
 \usepackage{fancyhdr}
 \usepackage{setspace}
 \usepackage{booktabs}
+\usepackage[table]{xcolor}
 \usepackage{enumitem}
 \usepackage{amsmath}
-\usepackage{mathpazo}
-\usepackage{newpxtext}
-\usepackage{newpxmath}
+\usepackage{amssymb}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
 \setlength{\jot}{10pt} %% change vertical spacing in equation
 \setlength{\parindent}{0pt}
 \usepackage[hang,flushmargin]{footmisc}
@@ -199,4 +200,6 @@ $$
 The intuition is that each entry of $\tfrac{1}{n}X_i'X_i$ still satisfies LLN; however there are $p \times p$ entries. Ensuring all of them to be consistent is much harder, and the LLN fails in operator norm. 
 
 In this case, using sandwich standard errors always give underestimated true standard errors (or true sampling variability of $\hat{\beta}$). This failure in statistical \textit{inference} in high-dimensional data is another motivation of introducing Machine Learning in statistical modeling and causal inference.
+
+
 \end{document}
